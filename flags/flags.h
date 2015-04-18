@@ -55,10 +55,10 @@ public:
 	}
 };
 
-template<typename E>
-constexpr flags<E> make_flags(E e)
+template<typename EnumT>
+constexpr flags<EnumT> make_flags(EnumT e)
 {
-	return flags<E>(e);
+	return flags<EnumT>(e);
 }
 
 }

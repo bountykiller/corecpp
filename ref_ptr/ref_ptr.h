@@ -1,25 +1,25 @@
-#ifndef CORE_CPP_REF_PTR_H
-#define CORE_CPP_REF_PTR_H
+#ifndef EXPERIMENTALPP_REF_PTR_H
+#define EXPERIMENTALPP_REF_PTR_H
 
 #include <stdexcept>
 #include <type_traits>
 
-namespace corecpp
+namespace experimental 
 {
 
-template<typename _T>
+template<typename T>
 class ref_ptr final
 {
 public:
-	typedef typename std::remove_reference<_T>::type element_type;
-	typedef typename std::add_lvalue_reference<_T>::type reference_type;
-	typedef typename std::add_pointer<_T>::type pointer;
+	typedef typename std::remove_reference<T>::type element_type;
+	typedef typename std::add_lvalue_reference<T>::type reference_type;
+	typedef typename std::add_pointer<T>::type pointer;
 
 	ref_ptr() = default;
 	ref_ptr(const ref_ptr&) = default;
 
-	template<typename _Tp>
-	ref_ptr(const _Tp& ptr)
+	template<typename Tp>
+	ref_ptr(const Tp& ptr)
 	: m_ptr(ptr.get())
 	{}
 
@@ -39,8 +39,8 @@ public:
 		return m_ptr;
 	}
 	ref_ptr& operator =(const ref_ptr& ptr) = default;
-	template<typename TPointer>
-	ref_ptr& operator =(const TPointer& ptr)
+	template<typename Tp>
+	ref_ptr& operator =(const Tp& ptr)
 	{
 		m_ptr = ptr.get();
 		return *this;
@@ -54,16 +54,16 @@ private:
 };
 
 
-template<typename _Tp>
-ref_ptr<typename _Tp::element_type> take_ref(const _Tp& pointer)
+template<typename Tp>
+ref_ptr<typename Tp::element_type> take_ref(const Tp& pointer)
 {
-	return ref_ptr<typename _Tp::element_type>(pointer);
+	return ref_ptr<typename Tp::element_type>(pointer);
 }
 
-template<typename _Rp, typename _Tp>
-ref_ptr<_Rp> take_ref(const _Tp& pointer)
+template<typename Rp, typename Tp>
+ref_ptr<Rp> take_ref(const Tp& pointer)
 {
-	return ref_ptr<_Rp>(pointer);
+	return ref_ptr<Rp>(pointer);
 }
 
 }
