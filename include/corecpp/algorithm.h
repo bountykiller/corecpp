@@ -1,12 +1,12 @@
-#ifndef EXPERIMENTALPP_ALGORITHM_H
-#define EXPERIMENTALPP_ALGORITHM_H
+#ifndef CORE_CPP_ALGORITHM_H
+#define CORE_CPP_ALGORITHM_H
 
 #include <algorithm>
 #include <type_traits>
 #include <string>
 
 
-namespace experimental
+namespace corecpp
 {
 	template<class ContainerT>
 	struct self
@@ -62,10 +62,10 @@ namespace experimental
 	template<typename StringT>
 	StringT toPascalCase(const StringT& in)
 	{
-		StringT camelString = "";
+		StringT PascalString = "";
 		auto pos = in.cbegin();
 		auto start = pos;
-		camelString.reserve(in.size());
+		PascalString.reserve(in.size());
 		bool shouldBeUpper = true;
 		while(pos != in.cend())
 		{
@@ -73,7 +73,7 @@ namespace experimental
 			{
 				if(!shouldBeUpper)
 				{
-					camelString.append(start, pos);
+					PascalString.append(start, pos);
 					shouldBeUpper = true;
 				}
 				start = ++pos;
@@ -83,8 +83,8 @@ namespace experimental
 				if (isupper(*pos) != shouldBeUpper)
 				{
 					if(start != pos)
-						camelString.append(start, pos);
-					camelString += std::toupper(*pos);
+						PascalString.append(start, pos);
+					PascalString += std::toupper(*pos);
 					start = ++pos;
 				}
 				else
@@ -93,9 +93,9 @@ namespace experimental
 			}
 		}
 		if(start != pos)
-			camelString.append(start, pos);
+			PascalString.append(start, pos);
 
-		return camelString;
+		return PascalString;
 	}
 
 	template<typename StringT>

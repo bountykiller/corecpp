@@ -1,0 +1,2 @@
+file(GLOB core_HEADERS *.h)
+install (FILES ${core_HEADERS} DESTINATION include/corecpp)

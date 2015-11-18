@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=@CMAKE_INSTALL_PREFIX@/bin
+libdir=@CMAKE_INSTALL_PREFIX@/lib
+includedir=@CMAKE_INSTALL_PREFIX@/include
+
+Name: corecpp
+Description: cpp core libraries
+Version: @CORECPP_VERSION@
+Cflags: -I${includedir}
+Libs: -L${libdir} -lcorecpp
