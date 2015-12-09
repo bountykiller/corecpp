@@ -3,6 +3,7 @@
 
 #include <typeinfo>
 #include <type_traits>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
 
@@ -148,6 +149,7 @@ using pvalue = typename std::add_pointer<typename type_resolver<T>::type>::type;
 
 template<typename T>
 using concrete = typename type_resolver<T>::type;
+
 
 }
 

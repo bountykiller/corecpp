@@ -21,7 +21,7 @@ public:
 	{
 		static constexpr uint value = corecpp::type_index<T, TArgs...>::value;
 	};
-	
+
 	variant()
 	: m_data(), m_type_index(no_type)
 	{}
@@ -31,17 +31,17 @@ public:
 	{
 		other.m_type_index = no_type;
 	}
-	
+
 	template<typename T>
 	variant(T&& data)
 	: m_data(std::forward<T>(data)), m_type_index(index_of<T>::value)
 	{}
-	
+
 	template<typename T>
 	variant(const T& data)
 	: m_data(data), m_type_index(index_of<T>::value)
 	{}
-	
+
 	variant& operator = (const variant& data) = delete;
 	variant& operator = (variant&& other)
 	{
@@ -51,7 +51,7 @@ public:
 		other.m_type_index = no_type;
 		return *this;
 	}
-	
+
 	template<typename T>
 	variant& operator = (T&& data)
 	{
@@ -59,7 +59,7 @@ public:
 		m_type_index = index_of<T>::value;
 		return *this;
 	}
-	
+
 	template<typename T>
 	variant& operator = (const T& data)
 	{
@@ -67,26 +67,26 @@ public:
 		m_type_index = index_of<T>::value;
 		return *this;
 	}
-	
-	uint which() const 
+
+	uint which() const
 	{
 		return m_type_index;
 	}
-	
+
 	template<typename T>
 	T& get()
 	{
 		assert(m_type_index == index_of<T>::value);
 		return m_data.get<T>();
 	}
-	
+
 	template<typename T>
 	const T& get() const
 	{
 		assert(m_type_index == index_of<T>::value);
 		return m_data.get<T>();
 	}
-	
+
 	operator bool() const
 	{
 		return m_type_index != no_type;

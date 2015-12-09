@@ -29,9 +29,12 @@ namespace corecpp
 			accumul(init, transform(t));
 		return init;
 	}
-
+	/*
 	template<typename ContainerT, typename ValueT = typename ContainerT::value_type, typename SeparatorT = ValueT>
-	ValueT concat(const ContainerT& a, const SeparatorT& separator)
+	*/
+	template<typename ValueT, template<typename T> typename ContainerT = std::initializer_list,
+			typename SeparatorT = ValueT, typename ParamT = ContainerT<ValueT>>
+	ValueT concat(const ParamT& a, const SeparatorT& separator)
 	{
 		ValueT res;
 		res.reserve(corecpp::aggregate(a, corecpp::size<ValueT>(), std::plus<std::size_t>()) + separator.size() * a.size());
@@ -48,8 +51,9 @@ namespace corecpp
 		return res;
 	}
 
-	template<typename ContainerT, typename ValueT = typename ContainerT::value_type>
-	ValueT concat(const ContainerT& a)
+	template<typename ValueT, template<typename T> typename ContainerT = std::initializer_list,
+			typename ParamT = ContainerT<ValueT>>
+	ValueT concat(const ParamT& a)
 	{
 		ValueT res;
 		res.reserve(corecpp::aggregate(a, corecpp::size<ValueT>(), std::plus<std::size_t>()));
