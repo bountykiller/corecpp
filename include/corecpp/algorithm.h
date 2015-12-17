@@ -34,7 +34,7 @@ namespace corecpp
 	/*
 	template<typename ContainerT, typename ValueT = typename ContainerT::value_type, typename SeparatorT = ValueT>
 	*/
-	template<typename ValueT, template<typename T> typename ContainerT = std::initializer_list,
+	template<typename ValueT, template<typename T> class ContainerT = std::initializer_list,
 			typename SeparatorT = ValueT, typename ParamT = ContainerT<ValueT>>
 	ValueT concat(const ParamT& a, const SeparatorT& separator)
 	{
@@ -53,7 +53,7 @@ namespace corecpp
 		return res;
 	}
 
-	template<typename ValueT, template<typename T> typename ContainerT = std::initializer_list,
+	template<typename ValueT, template<typename T> class ContainerT = std::initializer_list,
 			typename ParamT = ContainerT<ValueT>>
 	ValueT concat(const ParamT& a)
 	{
