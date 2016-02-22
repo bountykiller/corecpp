@@ -2,7 +2,9 @@
 #define CORE_CPP_ALGORITHM_H
 
 #include <algorithm>
+#include <locale>
 #include <type_traits>
+#include <unordered_map>
 #include <string>
 
 
@@ -110,6 +112,24 @@ namespace corecpp
 		if(res.length() > 0)
 			res[0] = std::tolower(res[0]);
 		return std::move(res);
+	}
+	
+	
+	
+	template<typename StringT, typename EnumT>
+	bool enum_parse(const StringT& str, EnumT& type, const std::unordered_map<EnumT, StringT>& mapping, std::locale l = std::locale())
+	{
+		auto& comparer = std::use_facet<std::collate<typename StringT::char_type>>(l);
+		for (const auto& tmp : mapping)
+		{
+			if (!comparer.compare(str.data(), str.data() + str.size(),
+								tmp->second.data(), tmp->second.data() + tmp->second.size()))
+			{
+				type = tmp->first;
+				return true;
+			}
+		}
+		return false;
 	}
 
 }
