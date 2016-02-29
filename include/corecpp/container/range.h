@@ -32,6 +32,14 @@ public:
 	{
 		return m_end;
 	}
+	auto size() const
+	{
+		return m_end - m_begin;
+	}
+	bool empty() const
+	{
+		return m_begin == m_end;
+	}
 };
 
 }

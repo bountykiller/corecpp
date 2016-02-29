@@ -2,11 +2,15 @@
 #define CORE_CPP_ALGORITHM_H
 
 #include <algorithm>
+#include <initializer_list>
 #include <locale>
+#include <stdexcept>
+#include <string>
 #include <type_traits>
 #include <unordered_map>
 #include <string>
 #include <mutex>
+#include <utility>
 
 
 namespace corecpp
@@ -115,23 +119,34 @@ namespace corecpp
 		return std::move(res);
 	}
 	
-	
-	
-	template<typename StringT, typename EnumT>
-	bool enum_parse(const StringT& str, EnumT& type, const std::unordered_map<EnumT, StringT>& mapping, std::locale l = std::locale())
+	template<typename EnumT>
+	using enum_map = std::initializer_list<std::pair<EnumT, std::string>>;
+
+	template<typename EnumT, typename MapT = enum_map<EnumT>>
+	static const auto& etos(EnumT value, const MapT& mapping)
 	{
-		auto& comparer = std::use_facet<std::collate<typename StringT::char_type>>(l);
+		for (const auto& tmp : mapping)
+		{
+			if (value == tmp.first)
+				return tmp.second;
+		}
+		throw std::logic_error("Unknow enum value");
+	}
+	
+	template<typename StringT, typename EnumT, typename MapT = enum_map<EnumT>>
+	static bool stoe(const StringT& str, EnumT& value, const MapT& mapping, std::locale l = std::locale())
+	{
+		auto& comparer = std::use_facet<std::collate<typename StringT::value_type>>(l);
 		for (const auto& tmp : mapping)
 		{
 			if (!comparer.compare(str.data(), str.data() + str.size(),
-								tmp->second.data(), tmp->second.data() + tmp->second.size()))
+								tmp.second.data(), tmp.second.data() + tmp.second.size()))
 			{
-				type = tmp->first;
+				value = tmp.first;
 				return true;
 			}
 		}
 		return false;
 	}
-
 }
 #endif
