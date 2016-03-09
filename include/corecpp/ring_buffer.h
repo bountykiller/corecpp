@@ -33,8 +33,8 @@ namespace corecpp
 	public:
 		using value_type = ValueT;
 		using allocator_type = AllocatorT;
-		using reference_type = std::add_lvalue_reference<ValueT>::type;
-		using const_reference_type = std::add_const<reference_type>::type;
+		using reference_type = typename std::add_lvalue_reference<ValueT>::type;
+		using const_reference_type = typename std::add_const<reference_type>::type;
 
 		ring_buffer(std::size_t capacity)
 		: ring_buffer(capacity, allocator_type())
@@ -88,8 +88,8 @@ namespace corecpp
 		{
 			return m_buffer[last()];
 		}
-		template<typename ArgsT, ...>
-		bool try_emplace_back(ArgsT&& args)
+		template<typename ...ArgsT>
+		bool try_emplace_back(ArgsT&&... args)
 		{
 			if (m_count >= m_capacity)
 				return false;
@@ -99,8 +99,8 @@ namespace corecpp
 		}
 		/* data could be overwritten
 		 */
-		template<typename ArgsT, ...>
-		void emplace_back(ArgsT&& args)
+		template<typename ...ArgsT>
+		void emplace_back(ArgsT&&... args)
 		{
 			if (m_count >= m_capacity)
 				m_allocator.destroy(&m_buffer[next()]);
@@ -131,7 +131,7 @@ namespace corecpp
 		void pop_front()
 		{
 			if (m_count == 0)
-				throw std::underflow_error();
+				throw std::underflow_error("pop_front");
 			m_allocator.destroy(&m_buffer[m_first]);
 			if(++m_first == m_capacity)
 				m_first = 0;
@@ -140,7 +140,7 @@ namespace corecpp
 		void pop_back()
 		{
 			if (m_count == 0)
-				throw std::underflow_error();
+				throw std::underflow_error("pop_back");
 			m_allocator.destroy(&m_buffer[last()]);
 			--m_count;
 		}

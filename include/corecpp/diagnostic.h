@@ -1,17 +1,26 @@
-#ifndef _ERROR_MANAGER_H_
-#define _ERROR_MANAGER_H_
+#ifndef CORECPP_DIAGNOSTIC_H
+#define CORECPP_DIAGNOSTIC_H
 
 #include <vector>
 #include <string>
 #include <chrono>
 #include <ctime>
 #include <iomanip>
+#include <fstream>
 #include <functional>
 #include <unordered_map>
 #include <memory>
 #include <mutex>
+#include <thread>
+#include <chrono>
+
+#include <corecpp/ring_buffer.h>
+#include <corecpp/waiting_queue.h>
 
 namespace corecpp
+{
+
+namespace diagnostic
 {
 
 enum struct diagnostic_level : short
@@ -37,6 +46,7 @@ inline static const std::string& to_string(diagnostic_level level)
 }
 
 
+
 struct event
 {
 	diagnostic_level level;
@@ -55,21 +65,115 @@ inline std::ostream& operator << (std::ostream& os, const event& e)
 }
 
 
+
+struct appender
+{
+	virtual void append(const event& ev) = 0;
+};
+
+
+struct formatter
+{
+	using format_fn_type = std::function<void(std::string& str, const event& ev)>;
+	std::vector<format_fn_type> m_functions;
+public:
+	formatter(const std::string& format);
+	std::string format(const event& ev);
+};
+
+
+class file_appender : public appender
+{
+	std::string m_filename;
+	std::ofstream m_stream;
+	formatter m_formatter;
+	std::size_t m_file_size;
+	std::size_t m_max_file_size;
+public:
+	file_appender(std::string filename, const std::string& format);
+	std::size_t file_size() const
+	{
+		return m_file_size;
+	}
+	file_appender& max_file_size(std::size_t size)
+	{
+		m_max_file_size = size;
+		return *this;
+	}
+	std::size_t max_file_size() const
+	{
+		return m_max_file_size;
+	}
+	void append(const event& ev) override;
+};
+
+
+
+class periodic_file_appender : public appender
+{
+	std::string m_file_tmpl_name;
+	std::ofstream m_stream;
+	std::chrono::minutes m_duration;
+	std::chrono::time_point<std::chrono::system_clock> m_period;
+	formatter m_formatter;
+public:
+	periodic_file_appender(std::string& file_tmpl_name);
+	void append(const event& ev) override;
+};
+
+
+
+class console_appender : public appender
+{
+	formatter m_formatter;
+public:
+	console_appender(const std::string& format, bool with_colors = true);
+	void append(const event& ev) override;
+};
+
+
+template <typename AppenderT>
+class async_appender : public appender
+{
+	corecpp::waiting_queue<std::unique_ptr<event>> m_queue;
+	AppenderT m_appender;
+	std::thread m_thread;
+
+	void run()
+	{
+		while (std::unique_ptr<event> ev = m_queue.pop())
+		{
+			m_appender.append(ev);
+		}
+	}
+public:
+	template <typename ...T>
+	async_appender(T&&... args)
+	: m_appender(std::forward<T>(args)...), m_queue(), m_thread(run)
+	{
+	}
+	~async_appender()
+	{
+		m_queue.emplace(nullptr);
+		m_thread.join();
+	}
+	void append(const event& ev) override
+	{
+#if defined __cplusplus && __cplusplus >= 201402L
+		m_queue.emplace(std::make_unique<event>(ev));
+#else
+		m_queue.emplace(new event(ev));
+#endif
+	}
+};
+
+
 class channel final
 {
 	struct params
 	{
 		diagnostic_level level;
-		bool store_events;
-		bool output_events;
-		std::mutex output_mutex;
-		std::mutex store_mutex;
-		std::ostream& output;
-		std::vector<event> store;
-		params(diagnostic_level l, bool store, bool output, std::ostream& output_stream)
-		: level(l), store_events(store), output_events(output), output(output_stream)
-		{
-		}
+		appender& output;
 	};
 	std::shared_ptr<params> m_params; //using a shared_ptr in order to minimize the amount of time during which the channel is locked when logging
 	mutable std::mutex m_mutex;
@@ -81,45 +185,17 @@ public:
 	channel(channel&& other)
 	: m_params(std::move(other.m_params))
 	{}
-	channel(diagnostic_level level, bool store, bool output, std::ostream& output_stream);
+	channel(diagnostic_level level, appender& app)
+	: m_params(new params {level, app}), m_mutex()
+	{
+		/* TODO : resolve problem with make_shared
+		 * this will throw a bad_alloc on memory allocation error
+		 */
+	}
 	channel& operator=(channel&& other)
 	{
 		m_params = std::move(other.m_params);
 		return *this;
-	}
-	diagnostic_level level() const
-	{ 
-		std::lock_guard<std::mutex> lock(m_mutex);
-		return m_params->level;
-	}
-	void level(diagnostic_level value)
-	{ 
-		std::lock_guard<std::mutex> lock(m_mutex);
-		m_params->level = value; 
-	}
-	
-	bool is_storing_events() const
-	{ 
-		std::lock_guard<std::mutex> lock(m_mutex);
-		return m_params->store_events; 
-	}
-	void is_storing_events(bool value)
-	{ 
-		std::lock_guard<std::mutex> lock(m_mutex);
-		if(!value)
-			m_params->store.clear();
-		m_params->store_events = value;
-	}
-	
-	bool is_outputing_events() const
-	{ 
-		std::lock_guard<std::mutex> lock(m_mutex);
-		return m_params->output_events; 
-	}
-	void is_outputing_events(bool value)
-	{
-		std::lock_guard<std::mutex> lock(m_mutex);
-		m_params->output_events = value;
 	}
 	
 	void swap(channel& other)
@@ -135,17 +211,17 @@ public:
 };
 
 
+
 class manager
 {
-	static manager& instance();
 	std::unordered_map<std::string, channel> m_channels;
 	std::mutex m_mutex;
 	channel& _get_channel(const std::string& name);
 public:
 	template <typename T>
-	static channel& get_channel(T&& name)
+	channel& get_channel(T&& name)
 	{
-		return manager::instance()._get_channel(std::forward<T>(name));
+		return _get_channel(std::forward<T>(name));
 	}
 };
 
@@ -156,10 +232,6 @@ class event_producer
 public:
 	event_producer(channel& log_channel)
 	: m_channel(log_channel)
-	{}
-	template <typename T>
-	event_producer(T&& channel_name)
-	: m_channel(manager::get_channel(std::forward<T>(channel_name)))
 	{}
 	void fatal(std::string message, std::string file, uint line) const
 	{
@@ -274,7 +346,7 @@ inline void swap(channel& a, channel& b)
 
 }
 
-
+}
 
 #endif
 

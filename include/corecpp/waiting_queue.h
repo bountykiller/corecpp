@@ -16,79 +16,104 @@ namespace corecpp
 		mutable std::condition_variable m_condition;
 		public:
 			using value_type = std::remove_reference<ValueT>;
-			template<typename ArgsT...>
-			waiting_queue(ArgsT&& args)
+			template<typename ...ArgsT>
+			waiting_queue(ArgsT&&... args)
 			: m_container(std::forward<ArgsT>(args)...)
 			{
 			}
-			auto empty() const
+			bool empty() const
 			{
-				std::lock_guard lock(m_mutex);
+				std::lock_guard<std::mutex> lock(m_mutex);
 				return m_container.empty();
 			}
-			auto size() const
+			auto size() const -> decltype(m_container.size())
 			{
-				std::lock_guard lock(m_mutex);
+				std::lock_guard<std::mutex> lock(m_mutex);
 				return m_container.size();
 			}
 			void push(const value_type& value)
 			{
-				std::lock_guard lock(m_mutex);
+				std::lock_guard<std::mutex> lock(m_mutex);
 				m_container.push_back(value);
 				m_condition.notify_all();
 			}
-			template<typename ArgsT...>
-			void emplace(const ArgsT&& args)
+			template<typename ...ArgsT>
+			void emplace(const ArgsT&&... args)
 			{
-				std::lock_guard lock(m_mutex);
+				std::lock_guard<std::mutex> lock(m_mutex);
 				m_container.emplace_back(std::forward<ArgsT>(args)...);
 				m_condition.notify_all();
 			}
 			value_type pop()
 			{
-				std::unique_lock lock(m_mutex);
-				m_condition.wait(lock, [&m_container] { return !m_container.empty(); });
+				std::unique_lock<std::mutex> lock(m_mutex);
+				m_condition.wait(lock, [&] { return !m_container.empty(); });
 				value_type res = m_container.front();
 				m_container.pop_front();
 				return res;
 			}
-			template<typename T, typename = std::enable_if<std::is_assignable<T, std::add_rvalue_reference_t<value_type>>::value>::type>
-			bool try_pop(T& out)
+			template<typename T, typename =
+					typename std::enable_if<std::is_assignable<T, typename std::add_rvalue_reference<value_type>::type>::value>::type>
+			bool pop(T& out)
 			{
-				std::unique_lock lock(m_mutex);
+				std::unique_lock<std::mutex> lock(m_mutex);
 				if (m_container.empty())
 					return false;
 				out = std::move(m_container.front());
 				m_container.pop_front();
 				return true;
 			}
-			template<typename T, typename = std::enable_if<std::is_assignable<T, value_type>::value>::type>
-			bool try_pop(T& out)
+			template<typename T, typename = typename std::enable_if<std::is_assignable<T, value_type>::value>::type>
+			bool pop_try(T& out)
 			{
-				std::unique_lock lock(m_mutex);
+				std::unique_lock<std::mutex> lock(m_mutex);
 				if (m_container.empty())
 					return false;
 				out = m_container.front();
 				m_container.pop_front();
 				return true;
 			}
-			template<typename T, typename = std::enable_if<std::is_assignable<T, std::add_rvalue_reference_t<value_type>>::value>::type,
-					class Rep, class Period>
-			bool try_pop_for(T& out, const std::chrono::duration<Rep, Period>& rel_time)
+			template<typename T, class Rep, class Period,
+					typename CopyCtrArgT = typename std::add_rvalue_reference<value_type>::type,
+					typename  = typename std::enable_if<std::is_assignable<T, CopyCtrArgT>::value>::type>
+			bool pop_for(T& out, const std::chrono::duration<Rep, Period>& rel_time)
 			{
-				std::unique_lock lock(m_mutex);
-				if (!m_condition.wait_for(lock, rel_time, [&m_container] { return !m_container.empty(); }))
+				std::unique_lock<std::mutex> lock(m_mutex);
+				if (!m_condition.wait_for(lock, rel_time, [&] { return !m_container.empty(); }))
 					return false;
 				out = std::move(m_container.front());
 				m_container.pop_front();
 				return true;
 			}
-			template<typename T, typename = std::enable_if<std::is_assignable<T, value_type>::value>::type,
-					class Rep, class Period>
-			bool try_pop_for(T& out, const std::chrono::duration<Rep, Period>& rel_time)
+			template<typename T, class Rep, class Period,
+					typename = typename std::enable_if<std::is_assignable<T, value_type>::value>::type>
+			bool pop_for(T& out, const std::chrono::duration<Rep, Period>& rel_time)
 			{
-				std::unique_lock lock(m_mutex);
-				if (!m_condition.wait_for(lock, rel_time, [&m_container] { return !m_container.empty(); }))
+				std::unique_lock<std::mutex> lock(m_mutex);
+				if (!m_condition.wait_for(lock, rel_time, [&] { return !m_container.empty(); }))
+					return false;
+				out = m_container.front();
+				m_container.pop_front();
+				return true;
+			}
+			template<typename T, class Rep, class Period,
+					typename CopyCtrArgT = typename std::add_rvalue_reference<value_type>::type,
+					typename  = typename std::enable_if<std::is_assignable<T, CopyCtrArgT>::value>::type>
+			bool pop_until(T& out, const std::chrono::duration<Rep, Period>& rel_time)
+			{
+				std::unique_lock<std::mutex> lock(m_mutex);
+				if (!m_condition.wait_until(lock, rel_time, [&] { return !m_container.empty(); }))
+					return false;
+				out = std::move(m_container.front());
+				m_container.pop_front();
+				return true;
+			}
+			template<typename T, class Rep, class Period,
+					typename = typename std::enable_if<std::is_assignable<T, value_type>::value>::type>
+			bool pop_until(T& out, const std::chrono::duration<Rep, Period>& rel_time)
+			{
+				std::unique_lock<std::mutex> lock(m_mutex);
+				if (!m_condition.wait_until(lock, rel_time, [&] { return !m_container.empty(); }))
 					return false;
 				out = m_container.front();
 				m_container.pop_front();
