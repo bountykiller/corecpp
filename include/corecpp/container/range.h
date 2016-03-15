@@ -12,6 +12,7 @@ class range_from_iterator
 	IteratorT m_begin;
 	IteratorT m_end;
 public:
+	using value_type = typename IteratorT::value_type;
 	template<typename ArgsT> 
 	range_from_iterator(ArgsT&& begin, ArgsT&& end)
 	: m_begin(std::forward<ArgsT>(begin)), m_end(std::forward<ArgsT>(end))

@@ -5,6 +5,7 @@
 #include <mutex>
 #include <utility>
 #include <type_traits>
+#include <condition_variable>
 
 namespace corecpp
 {

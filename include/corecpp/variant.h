@@ -15,21 +15,16 @@ class variant
 	any m_data;
 	uint m_type_index;
 public:
-	static constexpr uint no_type = (uint)-1;
 	template<typename T>
 	struct index_of
 	{
 		static constexpr uint value = corecpp::type_index<T, TArgs...>::value;
 	};
 
-	variant()
-	: m_data(), m_type_index(no_type)
-	{}
 	variant(const variant&) = delete;
 	variant(variant&& other)
 	: m_data(std::move(other.m_data)), m_type_index(other.m_type_index)
 	{
-		other.m_type_index = no_type;
 	}
 
 	template<typename T>
@@ -48,7 +43,6 @@ public:
 		if(this == std::addressof(other)) return *this;
 		m_data = std::move(other.m_data);
 		m_type_index = other.m_type_index;
-		other.m_type_index = no_type;
 		return *this;
 	}
 
@@ -85,11 +79,6 @@ public:
 	{
 		assert(m_type_index == index_of<T>::value);
 		return m_data.get<T>();
-	}
-
-	operator bool() const
-	{
-		return m_type_index != no_type;
 	}
 };
 
