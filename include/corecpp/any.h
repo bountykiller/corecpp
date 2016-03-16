@@ -21,7 +21,7 @@ public:
 	{}
 	any(const any&) = delete;
 	any(any&& other)
-	: m_data(other.m_data)
+	: m_data(other.m_data), m_deleter(std::move(other.m_deleter))
 	{
 		other.m_data = nullptr;
 	};
@@ -42,6 +42,7 @@ public:
 	any& operator = (any&& other)
 	{
 		m_data = other.m_data;
+		m_deleter = std::move(other.m_deleter);
 		other.m_data = nullptr;
 		return *this;
 	}
