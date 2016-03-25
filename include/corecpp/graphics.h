@@ -104,10 +104,19 @@ constexpr const char* to_char(sgr_p r)
 	return rendition_strs[(int)r];
 }
 
+template <sgr_p param>
+struct graphic_rendition
+{
+	static const std::string value;
+};
 
 template <sgr_p param>
-std::string graphic_rendition = std::string("\x1b[") + to_char(param) + "m";
+const std::string graphic_rendition<param>::value = std::string("\x1b[") + to_char(param) + "m";
 
+#if defined __cplusplus && __cplusplus > 201103L
+template <sgr_p param>
+const std::string graphic_rendition_v = graphic_rendition<param>::value;
+#endif
 
 }
 

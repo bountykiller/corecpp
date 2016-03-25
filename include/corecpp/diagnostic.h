@@ -91,6 +91,8 @@ class file_appender : public appender
 	std::size_t m_max_file_size;
 public:
 	file_appender(std::string filename, const std::string& format);
+	~file_appender()
+	{}
 	std::size_t file_size() const
 	{
 		return m_file_size;
@@ -118,6 +120,8 @@ class periodic_file_appender : public appender
 	formatter m_formatter;
 public:
 	periodic_file_appender(std::string& file_tmpl_name);
+	~periodic_file_appender()
+	{}
 	void append(const event& ev) override;
 };
 
@@ -127,7 +131,11 @@ class console_appender : public appender
 {
 	formatter m_formatter;
 public:
-	console_appender(const std::string& format, bool with_colors = true);
+	console_appender(const std::string& format)
+	: m_formatter(format)
+	{}
+	~console_appender()
+	{}
 	void append(const event& ev) override;
 };
 
