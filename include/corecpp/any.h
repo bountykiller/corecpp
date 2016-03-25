@@ -25,14 +25,14 @@ public:
 	{
 		other.m_data = nullptr;
 	};
-	template<typename T>
-	any(const T& data) 
-	: m_data(new T(data)), m_deleter(make_deleter<T>())//TODO use std::rebind or something like that
-	{
-	}
-	template<typename T>
+	/* using perfect-forwarding can add extra-reference to T,
+	 * which becomes then non new-constructible.
+	 * The remove_reference is here to remove this extra-reference
+	 * in order to instanciate the right type.
+	 */
+	template<typename T, typename RealT = typename std::remove_reference<T>::type>
 	any(T&& data)
-	: m_data(new T(std::forward<T>(data))), m_deleter(make_deleter<T>())
+	: m_data(new RealT (std::forward<T>(data))), m_deleter(make_deleter<RealT >())
 	{
 	}
 	~any()

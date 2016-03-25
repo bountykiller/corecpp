@@ -27,14 +27,9 @@ public:
 	{
 	}
 
-	template<typename T>
+	template<typename T, typename RealT = typename std::remove_reference<T>::type>
 	variant(T&& data)
-	: m_data(std::forward<T>(data)), m_type_index(index_of<T>::value)
-	{}
-
-	template<typename T>
-	variant(const T& data)
-	: m_data(data), m_type_index(index_of<T>::value)
+	: m_data(std::forward<T>(data)), m_type_index(index_of<RealT>::value)
 	{}
 
 	variant& operator = (const variant& data) = delete;
