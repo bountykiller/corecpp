@@ -14,8 +14,8 @@
 #include <thread>
 #include <chrono>
 
-#include <corecpp/ring_buffer.h>
-#include <corecpp/waiting_queue.h>
+#include <corecpp/container/ring_buffer.h>
+#include <corecpp/container/waiting_queue.h>
 #include <corecpp/algorithm.h>
 
 namespace corecpp
@@ -81,6 +81,8 @@ class file_appender : public appender
 	formatter m_formatter;
 	std::size_t m_file_size;
 	std::size_t m_max_file_size;
+
+	void roll();
 public:
 	file_appender(std::string filename, const std::string& format);
 	~file_appender()
@@ -107,13 +109,13 @@ class periodic_file_appender : public appender
 {
 	std::string m_file_tmpl_name;
 	std::ofstream m_stream;
-	std::chrono::minutes m_duration;
-	std::chrono::time_point<std::chrono::system_clock> m_period;
+	std::chrono::minutes m_period;
+	std::chrono::time_point<std::chrono::system_clock> m_timestamp;
 	formatter m_formatter;
+
+	void roll();
 public:
-	periodic_file_appender(std::string& file_tmpl_name);
-	~periodic_file_appender()
-	{}
+	periodic_file_appender(std::string& file_tmpl_name, const std::string& format, std::chrono::minutes period);
 	void append(const event& ev) override;
 };
 

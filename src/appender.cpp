@@ -3,6 +3,8 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
+#include <cstdio>
+#include <cassert>
 #include <corecpp/diagnostic.h>
 #include <corecpp/graphics.h>
 
@@ -29,7 +31,7 @@ formatter::formatter(const std::string& format)
 				std::string str(start, pos - 1);
 				m_functions.emplace_back([str](std::string& msg, const event& ev) {
 					std::ostringstream oss;
-					time_t time = std::chrono::system_clock::to_time_t(ev.timestamp);
+					std::time_t time = std::chrono::system_clock::to_time_t(ev.timestamp);
 					oss << str << std::put_time(std::localtime(&time), "%F %T");
 					msg.append(oss.str());
 				});
@@ -102,26 +104,50 @@ file_appender::file_appender(std::string filename, const std::string& format)
 	m_file_size = m_stream.tellp(); // FIXME: approximation, could be inacurate
 }
 
+void file_appender::roll()
+{
+	std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	std::ostringstream rolled_name;
+	rolled_name << m_filename << "." << std::put_time(std::localtime(&time), "%F-%T");
+	m_stream.close();
+	//waiting for filesystem API to have something more c++ish
+	rename(m_filename.c_str(), rolled_name.str().c_str());
+	m_stream.open(m_filename, std::ios_base::out | std::ios_base::app);
+}
 
 void file_appender::append(const event& ev)
 {
 	if (m_max_file_size && m_file_size > m_max_file_size)
-	{
-		//TODO: roll files
-	}
+		roll();
 	std::string message = m_formatter.format(ev);
 	m_stream.write(message.c_str(), message.length());
 	m_file_size += message.length() * sizeof(char);
 }
 
 
+
+periodic_file_appender::periodic_file_appender(std::string& file_tmpl_name, const std::string& format, std::chrono::minutes period)
+: m_file_tmpl_name(file_tmpl_name), m_stream(), m_period(period), m_timestamp (), m_formatter(format)
+{}
+
+void periodic_file_appender::roll()
+{
+	std::ostringstream rolled_name;
+	std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	rolled_name << std::put_time(std::localtime(&time), m_file_tmpl_name.c_str());
+	m_stream.close();
+	m_stream.open(rolled_name.str(), std::ios_base::out | std::ios_base::app);
+}
+
 void periodic_file_appender::append(const event& ev)
 {
-	if (m_period > ev.timestamp)
+	if (m_timestamp < ev.timestamp)
 	{
-		//TODO: roll files
-		m_period += m_duration;
+		roll();
+		long factor = (long)std::ceil((ev.timestamp - m_timestamp) / m_period);
+		m_timestamp += m_period * factor;
 	}
+	assert (m_timestamp >= ev.timestamp);
 	std::string message = m_formatter.format(ev);
 	m_stream.write(message.c_str(), message.length());
 }
