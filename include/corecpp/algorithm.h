@@ -18,14 +18,14 @@ namespace corecpp
 	template<class ContainerT>
 	struct self
 	{
-		inline auto operator()(ContainerT& t) const
+		inline ContainerT& operator()(ContainerT& t) const
 		{ return t; }
 	};
 
 	template<class ContainerT>
 	struct size
 	{
-		inline auto operator()(ContainerT& t) const
+		inline std::size_t operator()(ContainerT& t) const
 		{ return t.size(); }
 	};
 
@@ -123,7 +123,7 @@ namespace corecpp
 	using enum_map = std::initializer_list<std::pair<EnumT, std::string>>;
 
 	template<typename EnumT, typename MapT = enum_map<EnumT>>
-	static const auto& etos(EnumT value, const MapT& mapping)
+	static const std::string& etos(EnumT value, const MapT& mapping)
 	{
 		for (const auto& tmp : mapping)
 		{

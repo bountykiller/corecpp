@@ -40,6 +40,8 @@ public:
 	flags& operator -=(flags f) { m_value -= f.m_value; return *this; }
 	flags& operator |=(flags f) { m_value |= f.m_value; return *this; }
 	flags& operator &=(flags f) { m_value &= f.m_value; return *this; }
+
+	flags& operator =(underlying_type value) { m_value = value; return *this;}
 	
 	constexpr underlying_type get() const
 	{

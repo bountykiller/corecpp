@@ -61,6 +61,7 @@ formatter::formatter(const std::string& format)
 			{
 				std::string str(start, pos - 1);
 				m_functions.emplace_back([str](std::string& msg, const event& ev) { msg.append(str).append(ev.file); } );
+				start = ++pos;
 				break;
 			}
 			case 'g':

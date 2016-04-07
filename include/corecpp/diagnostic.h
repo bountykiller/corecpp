@@ -16,6 +16,7 @@
 
 #include <corecpp/ring_buffer.h>
 #include <corecpp/waiting_queue.h>
+#include <corecpp/algorithm.h>
 
 namespace corecpp
 {
@@ -35,16 +36,8 @@ enum struct diagnostic_level : short
 	debug = 7
 };
 
-inline static const std::string& to_string(diagnostic_level level)
-{
-	using namespace std;
-	static const std::string string_table[8] = {
-		"FATAL", "ERROR", "WARNING", "FAILLURE",
-		"SUCCESS", "INFO", "TRACE", "DEBUG"
-	};
-	return string_table[(short)level];
-}
-
+const std::string& to_string(diagnostic_level type);
+bool from_string(const std::string& str, diagnostic_level& type, std::locale l);
 
 
 struct event
@@ -63,7 +56,6 @@ inline std::ostream& operator << (std::ostream& os, const event& e)
 	//return os << std::put_time(std::localtime(&timestamp), "%F %T") << ":" << to_string(e.level) << " at " << e.file << ":" << e.line << "\t" << e.message << "\t" << e.details;
 	return os << to_string(e.level) << " at " << e.file << ":" << e.line << "\t" << e.message << "\t" << e.details;
 }
-
 
 
 struct appender
@@ -178,6 +170,7 @@ public:
 
 class channel final
 {
+	//NOTE: multhi-treading managment will probably change in near future
 	struct params
 	{
 		diagnostic_level level;
@@ -213,6 +206,12 @@ public:
 		std::swap(m_params, other.m_params);
 	}
 	
+	void set_level(diagnostic_level value)
+	{
+		std::lock_guard<std::mutex> lock(m_mutex);
+		m_params->level = value;
+	}
+	
 	void diagnose(diagnostic_level level, std::string message, std::string file, uint line);
 	void diagnose(diagnostic_level level, std::string message, std::string details, std::string file, uint line);
 	void diagnose(diagnostic_level level, std::string message, std::function<std::string()> details, std::string file, uint line);
@@ -222,14 +221,27 @@ public:
 
 class manager
 {
+	std::unique_ptr<channel> m_default;
 	std::unordered_map<std::string, channel> m_channels;
 	std::mutex m_mutex;
+	static manager m_instance;
 	channel& _get_channel(const std::string& name);
+	channel& _default_channel();
+	manager() = default;
 public:
 	template <typename T>
-	channel& get_channel(T&& name)
+	static channel& get_channel(T&& name)
 	{
-		return _get_channel(std::forward<T>(name));
+		return m_instance._get_channel(std::forward<T>(name));
+	}
+	static void set_default(diagnostic_level level, appender& app)
+	{
+		std::lock_guard<std::mutex> lock(m_instance.m_mutex);
+		m_instance.m_default.reset(new channel(level, app));
+	}
+	static channel& default_channel()
+	{
+		return m_instance._default_channel();
 	}
 };
 
