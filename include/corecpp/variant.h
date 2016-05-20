@@ -20,6 +20,11 @@ public:
 	{
 		static constexpr uint value = corecpp::type_index<T, TArgs...>::value;
 	};
+	template<size_t index>
+	struct type_at
+	{
+		using type = typename corecpp::type_at<index, TArgs...>::type;
+	};
 
 	variant(const variant&) = delete;
 	variant(variant&& other)
@@ -74,6 +79,20 @@ public:
 	{
 		assert(m_type_index == index_of<T>::value);
 		return m_data.get<T>();
+	}
+
+	template<uint pos>
+	typename type_at<pos>::type& at()
+	{
+		assert(m_type_index == pos);
+		return m_data.get<typename type_at<pos>::type>();
+	}
+
+	template<uint pos>
+	const typename type_at<pos>::type& at() const
+	{
+		assert(m_type_index == pos);
+		return m_data.get<typename type_at<pos>::type>();
 	}
 };
 

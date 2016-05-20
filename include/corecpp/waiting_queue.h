@@ -71,7 +71,7 @@ namespace corecpp
 				if (m_container.empty())
 					return false;
 				out = m_container.front();
-				m_container.pop_front();
+                                m_container.pop_front();
 				return true;
 			}
 			template<typename T, class Rep, class Period,

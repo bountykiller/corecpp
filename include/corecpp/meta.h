@@ -130,6 +130,20 @@ struct type_at
 };
 template<size_t index, typename... TArgs> using type_at_t = typename type_at<index, TArgs...>::type;
 
+template<typename... ArgsT>
+struct mem_fn
+{
+	template<typename ClassT, typename ResultT>
+	static auto fn(ResultT (ClassT::*arg)(ArgsT...))
+	{
+		return arg;
+	}
+	template<typename ClassT, typename ResultT>
+	static auto const_fn(ResultT (ClassT::*arg)(ArgsT...) const)
+	{
+		return arg;
+	}
+};
 
 template<typename... TArgs>
 const std::type_info& type(size_t index)

@@ -17,7 +17,7 @@ public:
 	flags(const flags& value) = default;
 	constexpr flags(_Enum e) : m_value (static_cast<underlying_type>(e))
 	{}
-	explicit constexpr flags(underlying_type e) : m_value(e)
+	explicit constexpr flags(underlying_type e = 0) : m_value(e)
 	{}
 	constexpr flags operator +(_Enum e) const { return flags( m_value + static_cast<underlying_type>(e)); }
 	constexpr flags operator -(_Enum e) const { return flags( m_value - static_cast<underlying_type>(e)); }
