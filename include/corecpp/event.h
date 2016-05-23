@@ -5,6 +5,8 @@
 #include <functional>
 #include <type_traits>
 
+#include <corecpp/ref_ptr.h>
+
 namespace corecpp
 {
 	template<class>
@@ -27,6 +29,18 @@ namespace corecpp
 		{
 			m_observers.remove(func);
 			return func;
+		}
+		ref_ptr<func_type> rebind (func_type oldfunc, func_type newfunc)
+		{
+			for (auto& func : m_observers)
+			{
+				if (func == oldfunc)
+				{
+					func = newfunc;
+					return &func;
+				}
+			}
+			return nullptr;
 		}
 		//TODO: Perfect forwarding
 		template<typename = typename std::enable_if<std::is_void<result_type>::value>::type>

@@ -1,2 +1,2 @@
-file(GLOB net_HEADERS *.h)
-install (FILES ${net_HEADERS} DESTINATION include/corecpp/container)
+file(GLOB container_HEADERS *.h)
+install (FILES ${container_HEADERS} DESTINATION include/corecpp/container)
