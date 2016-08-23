@@ -10,12 +10,6 @@
 namespace corecpp
 {
 
-command_line::command_line()
-{}
-
-command_line::~command_line()
-{}
-
 void command_line::load(int argc, char** argv)
 {
 	int i = 1;
@@ -31,7 +25,7 @@ void command_line::load(int argc, char** argv)
 				param_value = ""; //param with no value => value is set to empty_string
 			else
 				i++; //param with value => must skip one string
-			std::map<std::string, parameter*>::const_iterator param = m_parameters_by_name.find(param_name);
+			auto param = m_parameters_by_name.find(param_name);
 			if(param == m_parameters_by_name.end())
 				throw std::invalid_argument(param_name);
 			param->second->read_value(param_value);
@@ -49,7 +43,7 @@ void command_line::load(int argc, char** argv)
 				iter != param_name.end(); )
 			{
 				char shortname = *iter;
-				std::map<char, parameter*>::const_iterator param = m_parameters_by_shortname.find(shortname);
+				auto param = m_parameters_by_shortname.find(shortname);
 				if(param == m_parameters_by_shortname.end())
 					throw std::invalid_argument(std::string(1, shortname));
 				if(++iter == param_name.end())//last param => must give the value to it
@@ -67,7 +61,7 @@ void command_line::load(int argc, char** argv)
 	}
 }
 
-void command_line::display_help_message()
+void command_line::usage()
 {
 	for (const auto& sumary : m_parameters_summary)
 	{

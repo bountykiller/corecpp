@@ -4,6 +4,7 @@
 #include <sstream>
 #include <vector>
 #include <map>
+#include <memory>
 #include <string>
 
 
@@ -54,33 +55,71 @@ namespace corecpp
 			bool& m_value;
 	};
 
-	struct param_descriptor_type
+	template <typename T>
+	struct param_descriptor
 	{
 		char shortname;
 		std::string name;
 		std::string helpmsg;
+		typename generic_parameter<T>::value_type& value;
 	};
-
-	class command_line
+	template <typename T>
+	param_descriptor<T> make_param(char shortname, const std::string& name, const std::string& helpmsg, T& value)
 	{
+		return { shortname, name, helpmsg, value };
+	}
+	template <typename T>
+	param_descriptor<T> make_param(char shortname, std::string&& name, std::string&& helpmsg, T& value)
+	{
+		return { shortname, name, helpmsg, value };
+	}
+
+	class command_line final
+	{
+		struct parameter_usage
+		{
+			char shortname;
+			std::string name;
+			std::string helpmsg;
+			parameter_usage(char s, std::string&& n, std::string&& h)
+			: shortname(s), name(n), helpmsg(h)
+			{}
+		};
 		public:
-			command_line();
-			virtual ~command_line();
+			command_line()
+			{}
 			template <typename T>
-			void add_param( const std::string& name, const char shortname, const std::string& helpmsg,
-							typename generic_parameter<T>::value_type& value)
+			command_line(param_descriptor<T>&& descriptor)
 			{
-				m_parameters_by_shortname[shortname] = new generic_parameter<T>(value);
-				m_parameters_by_name[name] = new generic_parameter<T>(value);
-				m_parameters_summary.emplace_back(param_descriptor_type { shortname, name, helpmsg });
+				add_param(std::forward<param_descriptor<T>>(descriptor));
 			}
-			void add_param( const std::string& name, const char shortname, const std::string& helpmsg, parameter* param);
+			template <typename T, typename... Args>
+			command_line(param_descriptor<T>&& descriptor, Args&&... args)
+			: command_line(std::forward<param_descriptor<T>>(descriptor))
+			{
+				add_param(std::forward<Args>(args)...);
+			}
+			~command_line()
+			{}
+			template <typename T>
+			void add_param(param_descriptor<T>&& descriptor)
+			{
+				m_parameters_by_shortname.emplace(descriptor.shortname, new generic_parameter<T>(descriptor.value));
+				m_parameters_by_name.emplace(descriptor.name, new generic_parameter<T>(descriptor.value));
+				m_parameters_summary.emplace_back(descriptor.shortname, std::move(descriptor.name), std::move(descriptor.helpmsg));
+			}
+			template <typename T, typename... Args>
+			void add_param(param_descriptor<T>&& descriptor, Args&&... values)
+			{
+				add_param(std::forward<param_descriptor<T>>(descriptor));
+				add_param(std::forward<Args>(values)...);
+			}
 			void load(int argc, char** argv);
-			void display_help_message();
+			void usage();
 		private:
-			std::map<char, parameter*> m_parameters_by_shortname;
-			std::map<std::string, parameter*> m_parameters_by_name;
-			std::vector<param_descriptor_type> m_parameters_summary;
+			std::map<char, std::unique_ptr<parameter>> m_parameters_by_shortname;
+			std::map<std::string, std::unique_ptr<parameter>> m_parameters_by_name;
+			std::vector<parameter_usage> m_parameters_summary;
 	};
 
 }
