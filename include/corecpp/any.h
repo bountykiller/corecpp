@@ -63,6 +63,11 @@ public:
 		m_deleter = make_deleter<T>();
 		return *this;
 	}
+	
+	bool operator < (const any& other) const
+	{
+		return m_data < other.m_data;
+	}
 
 	template<typename T>
 	T& get()

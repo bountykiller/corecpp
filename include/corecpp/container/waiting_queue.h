@@ -45,13 +45,11 @@ namespace corecpp
 				m_container.emplace_back(std::forward<ArgsT>(args)...);
 				m_condition.notify_all();
 			}
-			value_type pop()
+			void pop()
 			{
 				std::unique_lock<std::mutex> lock(m_mutex);
 				m_condition.wait(lock, [&] { return !m_container.empty(); });
-				value_type res = m_container.front();
 				m_container.pop_front();
-				return res;
 			}
 			template<typename T, typename =
 					typename std::enable_if<std::is_assignable<T, typename std::add_rvalue_reference<value_type>::type>::value>::type>
@@ -71,7 +69,7 @@ namespace corecpp
 				if (m_container.empty())
 					return false;
 				out = m_container.front();
-                                m_container.pop_front();
+				m_container.pop_front();
 				return true;
 			}
 			template<typename T, class Rep, class Period,

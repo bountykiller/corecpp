@@ -62,6 +62,13 @@ public:
 		return *this;
 	}
 
+	bool operator < (const variant& other) const
+	{
+		if (m_type_index != other.m_type_index)
+			return m_type_index < other.m_type_index;
+		return m_data < other.m_data;
+	}
+
 	uint which() const
 	{
 		return m_type_index;

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <cstdio>
 #include <cassert>
+#include <cmath>
 #include <corecpp/diagnostic.h>
 #include <corecpp/graphics.h>
 

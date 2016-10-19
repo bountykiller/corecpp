@@ -38,12 +38,28 @@ public:
 	{
 		return m_ptr;
 	}
+	bool operator !()
+	{
+		return !m_ptr;
+	}
 	ref_ptr& operator =(const ref_ptr& ptr) = default;
 	template<typename TPointer>
 	ref_ptr& operator =(const TPointer& ptr)
 	{
 		m_ptr = ptr.get();
 		return *this;
+	}
+	bool operator ==(const ref_ptr& ptr)
+	{
+		return m_ptr == ptr.m_ptr;
+	}
+	bool operator !=(const ref_ptr& ptr)
+	{
+		return m_ptr != ptr.m_ptr;
+	}
+	bool operator <(const ref_ptr& ptr)
+	{
+		return m_ptr < ptr.m_ptr;
 	}
 	pointer get() const
 	{

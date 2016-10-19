@@ -134,12 +134,12 @@ template<typename... ArgsT>
 struct mem_fn
 {
 	template<typename ClassT, typename ResultT>
-	static auto fn(ResultT (ClassT::*arg)(ArgsT...))
+	static auto fn(ResultT (ClassT::*arg)(ArgsT...)) -> decltype(arg)
 	{
 		return arg;
 	}
 	template<typename ClassT, typename ResultT>
-	static auto const_fn(ResultT (ClassT::*arg)(ArgsT...) const)
+	static auto const_fn(ResultT (ClassT::*arg)(ArgsT...) const) -> decltype(arg)
 	{
 		return arg;
 	}
