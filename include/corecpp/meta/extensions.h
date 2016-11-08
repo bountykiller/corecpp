@@ -30,7 +30,7 @@ namespace
 }
 
 template <class F, class Tuple, typename... ArgsT>
-void tuple_apply(F &&f, Tuple &&t)
+void tuple_apply(F&& f, Tuple&& t, ArgsT&&... args)
 {
 	tuple_apply_impl<std::tuple_size<typename std::remove_reference<Tuple>::type>::value - 1, F, Tuple, ArgsT...> impl;
 	impl(std::forward<F>(f), std::forward<Tuple>(t), std::forward<ArgsT>(args)...);

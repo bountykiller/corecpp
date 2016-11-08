@@ -1,0 +1,15 @@
+object ::= '{''}'
+object ::= '{' pair [',' pair]* '}'
+
+pair ::= string ':' value
+
+array ::= '['']'
+array ::= '[' value [',' value]* ']'
+
+value ::= string
+value ::= number
+value ::= object
+value ::= array
+value ::= true
+value ::= false
+value ::= null
