@@ -6,7 +6,10 @@
 
 namespace corecpp
 {
-	//TODO: add overload for scalar types
+	/*TODO:
+	 * add overload for scalar types
+	 * make this thread-safe (no great interest oherwise)
+	 */
 	template <typename ValueT, typename AllocatorT = std::allocator<ValueT>>
 	class ring_buffer
 	{

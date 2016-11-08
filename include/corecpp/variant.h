@@ -9,6 +9,34 @@
 namespace corecpp
 {
 
+namespace
+{
+	template<typename VariantT, uint pos, typename VisitorT, typename... ArgsT>
+	struct variant_apply
+	{
+		auto operator()(VariantT& v, VisitorT&& visitor, ArgsT&&... args)
+		{
+			if (v.which() != pos)
+			{
+				variant_apply<VariantT, pos - 1, VisitorT, ArgsT...> applier;
+				return applier(v, std::forward<VisitorT>(visitor), std::forward<ArgsT>(args)...);
+			}
+			using match_type = typename VariantT::template type_at<pos>::type;
+			return visitor(v.template get<match_type>(), std::forward<ArgsT>(args)...);
+		}
+	};
+
+	template<typename VariantT, typename VisitorT, typename... ArgsT>
+	struct variant_apply<VariantT, 0, VisitorT, ArgsT...>
+	{
+		auto operator()(VariantT& v, VisitorT&& visitor, ArgsT&&... args)
+		{
+			using match_type = typename VariantT::template type_at<0>::type;
+			return visitor(v.template get<match_type>(), std::forward<ArgsT>(args)...);
+		}
+	};
+}
+
 template<typename... TArgs>
 class variant
 {
@@ -100,6 +128,13 @@ public:
 	{
 		assert(m_type_index == pos);
 		return m_data.get<typename type_at<pos>::type>();
+	}
+
+	template<class VisitorT, typename... ArgsT>
+	auto apply(VisitorT&& visitor, ArgsT&&... args)
+	{
+		variant_apply<variant<TArgs...>, sizeof...(TArgs) - 1, VisitorT, ArgsT...> applier;
+		return applier(*this, std::forward<VisitorT>(visitor), std::forward<ArgsT>(args)...);
 	}
 };
 

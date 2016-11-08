@@ -7,6 +7,9 @@
 #include <type_traits>
 #include <condition_variable>
 
+/* TODO:
+ * Add producer/consumer semantics
+ */
 namespace corecpp
 {
 	template <typename ValueT, typename ContainerT = std::deque<ValueT> >
