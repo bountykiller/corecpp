@@ -3,8 +3,8 @@
 
 #include <utility>
 #include <cassert>
-#include "meta.h"
-#include "any.h"
+#include <corecpp/meta/reflection.h>
+#include <corecpp/any.h>
 
 namespace corecpp
 {

@@ -1,3 +1,4 @@
 file(GLOB core_HEADERS *.h)
 install (FILES ${core_HEADERS} DESTINATION include/corecpp)
 add_subdirectory(container)
+add_subdirectory(meta)

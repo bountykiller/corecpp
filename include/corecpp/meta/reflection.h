@@ -1,12 +1,12 @@
-#ifndef CORE_CPP_META_H
-#define CORE_CPP_META_H
+#ifndef CORECPP_REFLECTON_H
+#define CORECPP_REFLECTON_H
 
+#include <iostream>
 #include <typeinfo>
-#include <type_traits>
+#include <typeinfo>
 #include <initializer_list>
 #include <stdexcept>
 #include <string>
-
 
 namespace corecpp
 {
@@ -130,6 +130,25 @@ struct type_at
 };
 template<size_t index, typename... TArgs> using type_at_t = typename type_at<index, TArgs...>::type;
 
+template<typename... TArgs>
+const std::type_info& type(size_t index)
+{
+	return variadic<TArgs...>::type(index);
+}
+
+
+
+template<class T>
+struct mem_val{};
+
+template<typename TClass, typename TType>
+struct mem_val<TType TClass::*>
+{
+	using class_type = TClass;
+	using value_type = TType;
+	using const_value_type = const TType;
+};
+
 template<typename... ArgsT>
 struct mem_fn
 {
@@ -145,24 +164,42 @@ struct mem_fn
 	}
 };
 
-template<typename... TArgs>
-const std::type_info& type(size_t index)
+
+
+template <typename ValueT>
+struct property
 {
-	return variadic<TArgs...>::type(index);
+	using class_type = typename mem_val<ValueT>::class_type;
+	using value_type = typename mem_val<ValueT>::value_type;
+	using const_value_type = typename mem_val<ValueT>::const_value_type;
+
+	const char* name;
+	const ValueT value;
+
+	template <typename T>
+	property(const char* n, const T v)
+	: name(n), value(v)
+	{}
+
+	value_type& get(class_type& obj) const
+	{
+		return obj.*value;
+	}
+	const_value_type& get(const class_type& obj) const
+	{
+		return obj.*value;
+	}
+	const_value_type& cget(const class_type& obj) const
+	{
+		return obj.*value;
+	}
+};
+
+template <typename StringT, typename ValueT>
+auto make_property(StringT&& name, ValueT&& value)
+{
+	return property<ValueT>(std::forward<StringT>(name), std::forward<ValueT>(value));
 }
-
-
-template<typename T>
-using lvalue = typename std::add_lvalue_reference<typename type_resolver<T>::type>::type;
-
-template<typename T>
-using rvalue = typename std::add_rvalue_reference<typename type_resolver<T>::type>::type;
-
-template<typename T>
-using pvalue = typename std::add_pointer<typename type_resolver<T>::type>::type;
-
-template<typename T>
-using concrete = typename type_resolver<T>::type;
 
 
 }

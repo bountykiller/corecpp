@@ -4,7 +4,7 @@
 #include <atomic>
 #include <memory>
 #include <utility>
-#include <corecpp/meta.h>
+#include <corecpp/meta/reflection.h>
 #include <corecpp/ref_ptr.h>
 
 namespace corecpp
