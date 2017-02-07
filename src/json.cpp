@@ -1,10 +1,10 @@
-#include <corecpp/serialization/common.h>
-#include <corecpp/serialization/json.h>
-#include <corecpp/algorithm.h>
 #include <codecvt>
 #include <locale>
 #include <memory>
 #include <cmath>
+#include <corecpp/serialization/common.h>
+#include <corecpp/serialization/json.h>
+#include <corecpp/algorithm.h>
 
 namespace corecpp
 {
@@ -56,7 +56,6 @@ wchar_t tokenizer::read_escaped_char()
 		 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, -1, -1, -1, -1, -1, -1,
 		-1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -66,27 +65,32 @@ wchar_t tokenizer::read_escaped_char()
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	};
+
+	assert (m_position + 4 <= m_buffer.size());
+
 	wchar_t a,b,c,d;
-	a = conversion_tab[(int)*(++m_position)];
-	b = conversion_tab[(int)*(++m_position)];
-	c = conversion_tab[(int)*(++m_position)];
-	d = conversion_tab[(int)*(++m_position)];
+	a = conversion_tab[(int)m_buffer[++m_position]];
+	b = conversion_tab[(int)m_buffer[++m_position]];
+	c = conversion_tab[(int)m_buffer[++m_position]];
+	d = conversion_tab[(int)m_buffer[++m_position]];
 	if ((a < 0) || (b < 0) || (c < 0) || (d < 0))
-		throw lexical_error("invalid unicode escape sequence");
+		throw lexical_error(corecpp::concat<std::string>({"invalid unicode escape sequence: ", std::to_string(a), ",",
+											std::to_string(b),  ",", std::to_string(c),  ",", std::to_string(d)}));
 	return (a << 12) + (b << 8) + (c << 4) + d;
 }
 
 std::unique_ptr<token> tokenizer::read_string_literal()
 {
-	if(++m_position == m_document.end())
+	if(++m_position == m_buffer.size())
 		return nullptr;
 
-	std::wstring literal(1, *m_position);
+	std::wstring literal;
 	bool good = false;
 	do
 	{
-		switch(*m_position)
+		switch(m_buffer[m_position])
 		{
 			case '\"':
 				good = true;
@@ -96,9 +100,9 @@ std::unique_ptr<token> tokenizer::read_string_literal()
 			case '\n':
 				throw lexical_error("invalid string expression : unexpected end of line");
 			case '\\':
-				if(++m_position == m_document.end())
+				if(++m_position == m_buffer.size())
 					return nullptr;
-				switch(*m_position)
+				switch(m_buffer[m_position])
 				{
 					case '"': literal += '"'; break;
 					case '\\': literal += '\\'; break;
@@ -109,6 +113,8 @@ std::unique_ptr<token> tokenizer::read_string_literal()
 					case 'r': literal += '\r'; break;
 					case 't': literal += '\t'; break;
 					case 'u':
+						if (m_position + 4 > m_buffer.size())
+							throw lexical_error("invalid string expression : unterminated escape sequence");
 						/* \u four-hex-digits */
 						literal += read_escaped_char();
 						break;
@@ -117,11 +123,11 @@ std::unique_ptr<token> tokenizer::read_string_literal()
 				}
 				break;
 			default:
-				literal += *m_position;
+				literal += m_buffer[m_position];
 				break;
 		}
 	}
-	while (++m_position != m_document.end() && !good);
+	while (++m_position != m_buffer.size() && !good);
 
 	if(!good)
 		return nullptr;
@@ -134,14 +140,14 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 	bool negative = false;
 	long integral_value = 0;
 	bool done = false;
-	if (*m_position == '-')
+	if (m_buffer[m_position] == '-')
 	{
 		negative = true;
 		++m_position;
 	}
 	do
 	{
-		switch(*m_position)
+		switch(m_buffer[m_position])
 		{
 			case '0':
 			case '1':
@@ -153,15 +159,15 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 			case '7':
 			case '8':
 			case '9':
-				integral_value = (10 * integral_value) + (*m_position - '0');
+				integral_value = (10 * integral_value) + (m_buffer[m_position] - '0');
 				break;
 			case '.':
 			{
 				long decimal_value = 0;
 				unsigned int decimal_precision = 1;
-				while(!done && ++m_position != m_document.end())
+				while(!done && ++m_position != m_buffer.size())
 				{
-					switch(*m_position)
+					switch(m_buffer[m_position])
 					{
 						case '0':
 						case '1':
@@ -173,7 +179,7 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 						case '7':
 						case '8':
 						case '9':
-							decimal_value = (10 * decimal_value) + (*m_position - '0');
+							decimal_value = (10 * decimal_value) + (m_buffer[m_position] - '0');
 							decimal_precision *= 10;
 							break;
 						case 'e':
@@ -181,18 +187,18 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 						{
 							long exponential_value = 0;
 							bool negative_exponential = false;
-							if (*m_position == '-')
+							if (m_buffer[m_position] == '-')
 							{
 								negative_exponential = true;
 								++m_position;
 							}
-							else if (*m_position == '+')
+							else if (m_buffer[m_position] == '+')
 							{
 								++m_position;
 							}
-							while(!done && ++m_position != m_document.end())
+							while(!done && ++m_position != m_buffer.size())
 							{
-								switch(*m_position)
+								switch(m_buffer[m_position])
 								{
 									case '0':
 									case '1':
@@ -204,7 +210,7 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 									case '7':
 									case '8':
 									case '9':
-										exponential_value = (10 * decimal_value) + (*m_position - '0');
+										exponential_value = (10 * decimal_value) + (m_buffer[m_position] - '0');
 										break;
 									default:
 									{
@@ -228,22 +234,28 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 				return std::make_unique<token>(integral_token { negative ? -integral_value : integral_value });
 		}
 	}
-	while(++m_position != m_document.end());
+	while(++m_position != m_buffer.size());
 
 	return nullptr;
 }
 
-std::unique_ptr<token> tokenizer::tokenize()
+std::unique_ptr<token> tokenizer::next()
 {
-	if(m_position == m_document.end())
-		return nullptr;
-	while (std::isspace(*m_position, m_locale))
+	if(m_position == m_buffer.size())
 	{
-		if(++m_position == m_document.end())
+		shrink();
+		return nullptr;
+	}
+	while (std::isspace(m_buffer[m_position], m_locale))
+	{
+		if(++m_position == m_buffer.size())
+		{
+			shrink();
 			return nullptr;
+		}
 	}
 	auto position = m_position;
-	switch(*m_position)
+	switch(m_buffer[m_position])
 	{
 		case '{':
 		{
@@ -279,7 +291,10 @@ std::unique_ptr<token> tokenizer::tokenize()
 		{
 			auto res = read_string_literal();
 			if (!res)
+			{
 				m_position = position;
+				shrink();
+			}
 			return res;
 		}
 		case '-':
@@ -294,38 +309,59 @@ std::unique_ptr<token> tokenizer::tokenize()
 		case '8':
 		case '9':
 		{
-			auto res = read_string_literal();
+			auto res = read_numeric_literal();
 			if (!res)
+			{
 				m_position = position;
+				shrink();
+			}
 			return res;
 		}
 		case 'f':
-			if (m_position++ != m_document.end() && *m_position == 'a'
-				&& m_position++ != m_document.end() && *m_position == 'l'
-				&& m_position++ != m_document.end() && *m_position == 's'
-				&& m_position++ != m_document.end() && *m_position == 'e'
-				&& (m_position++ == m_document.end() || !isalnum(*m_position, m_locale)))
+			if (m_position++ != m_buffer.size() && m_buffer[m_position] == 'a'
+				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'l'
+				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 's'
+				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'e'
+				&& (m_position++ == m_buffer.size() || !isalnum(m_buffer[m_position], m_locale)))
 			{
 				return std::make_unique<token>(false_token());
 			}
 			else
 			{
-				m_position = position;
-				return nullptr;
+				if (m_position == m_buffer.size())
+				{
+					m_position = position;
+					shrink();
+					return nullptr;
+				}
+				else
+				{
+					m_position = position; /* to stay in a valid state */
+					throw corecpp::syntax_error(reminder());
+				}
 			}
 
 		case 't':
-			if(m_position++ != m_document.end() && *m_position == 'r'
-				&& m_position++ != m_document.end() && *m_position == 'u'
-				&& m_position++ != m_document.end() && *m_position == 'e'
-				&& (m_position++ == m_document.end() || !isalnum(*m_position, m_locale)))
+			if(m_position++ != m_buffer.size() && m_buffer[m_position] == 'r'
+				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'u'
+				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'e'
+				&& (m_position++ == m_buffer.size() || !isalnum(m_buffer[m_position], m_locale)))
 			{
 				return std::make_unique<token>(false_token());
 			}
 			else
 			{
-				m_position = position;
-				return nullptr;
+				if (m_position == m_buffer.size())
+				{
+					m_position = position;
+					shrink();
+					return nullptr;
+				}
+				else
+				{
+					m_position = position; /* to stay in a valid state */
+					throw corecpp::syntax_error(reminder());
+				}
 			}
 		default:
 			m_position = position;
@@ -646,6 +682,86 @@ node parser::end(void)
 		if (pushed.next_rule.which() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
 			m_stack.emplace_back(std::move(pushed.next_rule.get<rule>()));
 	}
+}
+
+
+void serializer::convert_and_escape(const std::string& value)
+{
+	static const char hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+	for(unsigned char c : value)
+	{
+		if (std::isprint((char)c))
+			m_stream << c;
+		else if (c < 0x10)
+			m_stream << "\\u000" << hex_chars[c & 0x0F];
+		else
+			m_stream << "\\u00" << (hex_chars[c & 0xF0] << 4) << hex_chars[c & 0x0F];
+	}
+}
+
+
+void serializer::convert_and_escape(const std::wstring& value)
+{
+	static const char hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+	/* TODO: support not only UTF8 */
+	for(wchar_t c : value)
+	{
+		if (std::isprint((char)c))
+			m_stream << (char)c;
+		else if (c < 0x10)
+			m_stream << "\\u000" << hex_chars[c & 0x0F];
+		else if (c < 0x100)
+			m_stream << "\\u00" << hex_chars[(c & 0xF0) << 4] << hex_chars[c & 0x0F];
+		else if (c <= 0x7FF)
+		{
+			m_stream << (c >> 6) + 0xC0;
+			m_stream << (c & 0x3F) + 0x80;
+		}
+		else if (c <= 0xFFFF)
+		{
+			m_stream << (c >> 12) + 0xE0;
+			m_stream << ((c >> 6) & 0x3F) + 0x80;
+			m_stream << (c & 0x3F) + 0x80;
+		}
+		else if (c <= 0x10FFFF)
+		{
+			m_stream << (c >> 18) + 0xF0;
+			m_stream << ((c >> 12) & 0x3F) + 0x80;
+			m_stream << ((c >> 6) & 0x3F) + 0x80;
+			m_stream << (c & 0x3F) + 0x80;
+		}
+		else
+			throw std::range_error(corecpp::concat<std::string>({ "Unable to convert charcode ", std::to_string((uint32_t)c) }));
+	}
+}
+
+token deserializer::read()
+{
+	// 1st try, no read
+	auto token = m_tokenizer.next();
+	if (token)
+		return std::move(*token);
+	// 2nd try, read available data
+	auto available = m_stream.rdbuf()->in_avail();
+	std::string buffer;
+	buffer.resize(available);
+	m_stream.read((char*)buffer.data(), available);
+	m_tokenizer.eat(buffer);
+	token = m_tokenizer.next();
+	if (token)
+		return std::move(*token);
+	// 3rd try, read by block
+	do
+	{
+		if (m_stream.eof())
+			throw std::runtime_error("eof reached unexpectedly");
+		buffer.resize(1024);
+		m_stream.read((char*)buffer.data(), 1024);
+		m_tokenizer.eat(buffer);
+		token = m_tokenizer.next();
+	}
+	while (!token);
+	return std::move(*token);
 }
 
 }

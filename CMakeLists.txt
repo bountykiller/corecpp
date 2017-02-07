@@ -2,8 +2,8 @@ project(corecpp)
 
 cmake_minimum_required(VERSION 2.6)
 
-SET(CMAKE_CXX_FLAGS "-std=c++14")
-SET(CORECPP_VERSION "0.2")
+SET(CMAKE_CXX_FLAGS "-std=c++14 -fPIC")
+SET(CORECPP_VERSION "0.3")
 SET(PKGCONFIG_DIR ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig)
 SET(CMAKE_DIR ${CMAKE_INSTALL_PREFIX}/lib/cmake/corecpp)
 SET(PKGCONFIG_FILES ${CMAKE_CURRENT_BINARY_DIR}/corecpp.pc)

@@ -25,6 +25,22 @@ namespace corecpp
 		static constexpr bool value = true;
 	};
 
+
+	template<typename T, typename DeserializerT, typename Enable = void>
+	struct is_deserializable
+	{
+		static constexpr bool value = false;
+	};
+	template<typename T, typename DeserializerT>
+	struct is_deserializable<T, DeserializerT,
+							typename std::enable_if<
+								std::is_void<typename std::result_of<decltype(&T::template deserialize<DeserializerT>)(T, DeserializerT&)>::type
+							>::value>::type>
+	{
+		static constexpr bool value = true;
+	};
+
+
 	template <typename SerializerT, typename ValueT, typename Enable = void>
 	struct serialize_impl
 	{
@@ -56,6 +72,41 @@ namespace corecpp
 			s.write_array(std::forward<ValueT>(value));
 		}
 	};
+
+
+	template <typename DeserializerT, typename ValueT, typename Enable = void>
+	struct deserialize_impl
+	{
+	public:
+		void operator () (DeserializerT& d, ValueT& value)
+		{
+			d.read_object(value, std::remove_reference<ValueT>::type::properties());
+		}
+	};
+	template <typename DeserializerT, typename ValueT>
+	struct deserialize_impl<DeserializerT, ValueT,
+							typename std::enable_if<
+								is_deserializable<typename std::decay<ValueT>::type, typename std::decay<DeserializerT>::type>::value>
+							::type>
+	{
+	public:
+		void operator () (DeserializerT& d, ValueT& value)
+		{
+			d.template begin_object<ValueT>();
+			value.deserialize(d);
+			d.end_object();
+		}
+	};
+	template <typename DeserializerT, typename ValueT>
+	struct deserialize_impl<DeserializerT, ValueT,
+							typename std::enable_if<is_iterable<typename std::decay<ValueT>::type>::value>::type>
+	{
+		void operator () (DeserializerT& d, ValueT& value)
+		{
+			d.read_array(value);
+		}
+	};
+
 
 	struct lexical_error : std::invalid_argument
 	{

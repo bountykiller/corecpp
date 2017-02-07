@@ -1,11 +1,13 @@
 #ifndef CORECPP_REFLECTON_H
 #define CORECPP_REFLECTON_H
 
+#include <codecvt>
 #include <iostream>
 #include <typeinfo>
 #include <typeinfo>
 #include <type_traits>
 #include <initializer_list>
+#include <locale>
 #include <stdexcept>
 #include <string>
 
@@ -165,7 +167,41 @@ struct mem_fn
 	}
 };
 
-
+class property_name
+{
+	std::string m_value;
+	std::wstring m_wide_value;
+public:
+	property_name(const char* value)
+	: m_value(value)
+	{
+		m_wide_value = std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().from_bytes(value);
+	}
+	operator const std::string& () const
+	{
+		return m_value;
+	}
+	operator const std::wstring& () const
+	{
+		return m_wide_value;
+	}
+	bool operator == (const std::string& str) const
+	{
+		return str == m_value;
+	}
+	bool operator == (const std::wstring& str) const
+	{
+		return str == m_wide_value;
+	}
+	const std::string& str() const
+	{
+		return m_value;
+	}
+	const std::wstring& wstr() const
+	{
+		return m_wide_value;
+	}
+};
 
 template <typename ValueT>
 struct property
@@ -174,25 +210,31 @@ struct property
 	using value_type = typename mem_val<ValueT>::value_type;
 	using const_value_type = typename mem_val<ValueT>::const_value_type;
 
-	const char* name;
-	const ValueT value;
+private:
+	property_name m_name;
+	const ValueT m_value;
 
+public:
 	template <typename T>
 	property(const char* n, const T v)
-	: name(n), value(v)
-	{}
-
+	: m_name(n), m_value(v)
+	{
+	}
 	value_type& get(class_type& obj) const
 	{
-		return obj.*value;
+		return obj.*m_value;
 	}
 	const_value_type& get(const class_type& obj) const
 	{
-		return obj.*value;
+		return obj.*m_value;
 	}
 	const_value_type& cget(const class_type& obj) const
 	{
-		return obj.*value;
+		return obj.*m_value;
+	}
+	const std::wstring& name() const
+	{
+		return m_name.wstr();
 	}
 };
 
