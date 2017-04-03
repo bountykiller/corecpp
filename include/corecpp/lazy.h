@@ -28,17 +28,21 @@ namespace corecpp
 		{
 			if(m_data.which() == 0)
 				evaluate();
-			return m_data.get<value_type>();
+			return m_data.template get<value_type>();
 		}
 		value_type* operator->()
 		{
 			if(m_data.which() == 0)
 				evaluate();
-			return &m_data.get<value_type>();
+			return &m_data.template get<value_type>();
 		}
 		void reset(void)
 		{
 			m_data = nullptr;
+		}
+		operator bool() const
+		{
+			return (m_data.which() == 0);
 		}
 	};
 

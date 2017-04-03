@@ -6,6 +6,7 @@
 #include <utility>
 #include <type_traits>
 #include <condition_variable>
+#include <algorithm>
 
 /* TODO:
  * Add producer/consumer semantics
@@ -20,6 +21,7 @@ namespace corecpp
 		mutable std::condition_variable m_condition;
 		public:
 			using value_type = std::remove_reference<ValueT>;
+
 			template<typename ...ArgsT>
 			waiting_queue(ArgsT&&... args)
 			: m_container(std::forward<ArgsT>(args)...)
@@ -42,7 +44,7 @@ namespace corecpp
 				m_condition.notify_all();
 			}
 			template<typename ...ArgsT>
-			void emplace(const ArgsT&&... args)
+			void emplace(ArgsT&&... args)
 			{
 				std::lock_guard<std::mutex> lock(m_mutex);
 				m_container.emplace_back(std::forward<ArgsT>(args)...);
@@ -120,6 +122,17 @@ namespace corecpp
 				out = m_container.front();
 				m_container.pop_front();
 				return true;
+			}
+			void remove(const ValueT& value)
+			{
+				std::unique_lock<std::mutex> lock(m_mutex);
+				m_container.erase(std::remove(m_container.begin(), m_container.end(), value));
+			}
+			template<typename UnaryPredicateT>
+			void remove_if(UnaryPredicateT predicate)
+			{
+				std::unique_lock<std::mutex> lock(m_mutex);
+				m_container.erase(std::remove_if(m_container.begin(), m_container.end(), predicate));
 			}
 	};
 }
