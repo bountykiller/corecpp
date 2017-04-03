@@ -34,7 +34,7 @@ namespace corecpp
 	template<typename T, typename DeserializerT>
 	struct is_deserializable<T, DeserializerT,
 							typename std::enable_if<
-								std::is_void<typename std::result_of<decltype(&T::template deserialize<DeserializerT>)(T, DeserializerT&)>::type
+								std::is_void<typename std::result_of<decltype(&T::template deserialize<DeserializerT>)(T, DeserializerT&, std::string&)>::type
 							>::value>::type>
 	{
 		static constexpr bool value = true;
@@ -92,9 +92,7 @@ namespace corecpp
 	public:
 		void operator () (DeserializerT& d, ValueT& value)
 		{
-			d.template begin_object<ValueT>();
-			value.deserialize(d);
-			d.end_object();
+			d.read_object(value);
 		}
 	};
 	template <typename DeserializerT, typename ValueT>

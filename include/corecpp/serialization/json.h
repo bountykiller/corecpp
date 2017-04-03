@@ -417,6 +417,14 @@ namespace corecpp
 				m_stream << ']';
 			}
 
+			template <typename ValueT>
+			void write_element(ValueT&& value)
+			{
+				if (!m_first)
+					m_stream << ',';
+				serialize(value);
+				m_first = false;
+			}
 			template <typename StringT, typename ValueT>
 			void write_property(const StringT& name, ValueT&& value)
 			{
@@ -441,12 +449,7 @@ namespace corecpp
 			{
 				begin_array<ValueT>();
 				for (auto item : value)
-				{
-					if (!m_first)
-						m_stream << ',';
-					serialize(item);
-					m_first = false;
-				}
+					write_element(item);
 				end_array();
 			}
 		};
@@ -456,6 +459,7 @@ namespace corecpp
 		{
 			std::istream& m_stream;
 			tokenizer m_tokenizer;
+			bool m_first;
 
 			token read();
 			template<typename IntegralT, typename = std::enable_if<std::is_integral<IntegralT>::value, IntegralT>>
@@ -484,7 +488,7 @@ namespace corecpp
 			}
 		public:
 			deserializer(std::istream& s)
-			: m_stream(s)
+			: m_stream(s), m_tokenizer(), m_first(true)
 			{}
 			void deserialize(bool& value)
 			{
@@ -580,15 +584,48 @@ namespace corecpp
 			template <typename ValueT>
 			void begin_array()
 			{
+				m_first = true;
 				token tk = read();
 				if (tk.which() != token::index_of<open_bracket_token>::value)
 					throw std::runtime_error(corecpp::concat<std::string>({ "open bracket token expected, got ", to_string(tk) }));
 			}
 			void end_array()
 			{
+				m_first = false;
 				token tk = read();
 				if (tk.which() != token::index_of<close_bracket_token>::value)
 					throw std::runtime_error(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(tk) }));
+			}
+			template <typename ValueT>
+			void read_element(ValueT& value)
+			{
+				if (!m_first)
+				{
+					auto tk = read();
+					if (tk.which() != token::index_of<comma_token>::value)
+						throw std::runtime_error(corecpp::concat<std::string>({ "comma token expected, got ", to_string(tk) }));
+				}
+				deserialize(value);
+				m_first = false;
+			}
+			template <typename ValueT>
+			void read_object(ValueT& value)
+			{
+				token tk = read();
+				if (tk.which() != token::index_of<open_brace_token>::value)
+					throw std::runtime_error(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(tk) }));
+				do
+				{
+					std::string pname;
+					deserialize(pname);
+					tk = read();
+					if (tk.which() != token::index_of<colon_token>::value)
+						throw std::runtime_error(corecpp::concat<std::string>({ "colon token expected, got ", to_string(tk) }));
+					value.deserialize(*this, pname);
+					tk = read();
+				} while (tk.which() == token::index_of<comma_token>::value);
+				if (tk.which() != token::index_of<close_brace_token>::value)
+					throw std::runtime_error(corecpp::concat<std::string>({ "close brace expected, got ", to_string(tk) }));
 			}
 			template <typename ValueT, typename PropertiesT>
 			void read_object(ValueT& value, const PropertiesT& properties)

@@ -214,7 +214,7 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 										break;
 									default:
 									{
-										double value = exp(integral_value + (decimal_value/decimal_precision));
+										double value = exp((double)integral_value + ((double)decimal_value/decimal_precision));
 										return std::make_unique<token>(numeric_token { negative ? -value : value });
 									}
 								}
@@ -223,7 +223,7 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 						}
 						default:
 						{
-							double value = integral_value + (decimal_value/decimal_precision);
+							double value = (double)integral_value + ((double)decimal_value/decimal_precision);
 							return std::make_unique<token>(numeric_token { negative ? -value : value });
 						}
 					}
