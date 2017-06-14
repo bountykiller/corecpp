@@ -1,39 +1,40 @@
 #ifndef CORE_CPP_FLAGS_H
 #define CORE_CPP_FLAGS_H
 
+#include <iostream>
 #include <type_traits>
 
 namespace corecpp
 {
 
-template<typename _Enum>
+template<typename EnumT>
 class flags
 {
 public:
-	using underlying_type = typename std::underlying_type<_Enum>::type;
+	using underlying_type = typename std::underlying_type<EnumT>::type;
 private:
 	underlying_type m_value;
 public:
 	flags(const flags& value) = default;
-	constexpr flags(_Enum e) : m_value (static_cast<underlying_type>(e))
+	constexpr flags(EnumT e) : m_value (static_cast<underlying_type>(e))
 	{}
 	explicit constexpr flags(underlying_type e = 0) : m_value(e)
 	{}
-	constexpr flags operator +(_Enum e) const { return flags( m_value + static_cast<underlying_type>(e)); }
-	constexpr flags operator -(_Enum e) const { return flags( m_value - static_cast<underlying_type>(e)); }
-	constexpr flags operator |(_Enum e) const { return flags( m_value | static_cast<underlying_type>(e)); }
-	constexpr flags operator &(_Enum e) const { return flags( m_value & static_cast<underlying_type>(e)); }
+	constexpr flags operator +(EnumT e) const { return flags( m_value + static_cast<underlying_type>(e)); }
+	constexpr flags operator -(EnumT e) const { return flags( m_value - static_cast<underlying_type>(e)); }
+	constexpr flags operator |(EnumT e) const { return flags( m_value | static_cast<underlying_type>(e)); }
+	constexpr flags operator &(EnumT e) const { return flags( m_value & static_cast<underlying_type>(e)); }
 
 	constexpr flags operator +(flags f) const { return flags(m_value + f.m_value); }
 	constexpr flags operator -(flags f) const { return flags(m_value - f.m_value); }
 	constexpr flags operator |(flags f) const { return flags(m_value | f.m_value); }
 	constexpr flags operator &(flags f) const { return flags(m_value & f.m_value); }
 
-	flags& operator =(_Enum e) { m_value = static_cast<underlying_type>(e); return *this;}
-	flags& operator +=(_Enum e) { m_value += static_cast<underlying_type>(e); return *this; }
-	flags& operator -=(_Enum e) { m_value -= static_cast<underlying_type>(e); return *this; }
-	flags& operator |=(_Enum e) { m_value |= static_cast<underlying_type>(e); return *this; }
-	flags& operator &=(_Enum e) { m_value &= static_cast<underlying_type>(e); return *this; }
+	flags& operator =(EnumT e) { m_value = static_cast<underlying_type>(e); return *this;}
+	flags& operator +=(EnumT e) { m_value += static_cast<underlying_type>(e); return *this; }
+	flags& operator -=(EnumT e) { m_value -= static_cast<underlying_type>(e); return *this; }
+	flags& operator |=(EnumT e) { m_value |= static_cast<underlying_type>(e); return *this; }
+	flags& operator &=(EnumT e) { m_value &= static_cast<underlying_type>(e); return *this; }
 
 	flags& operator =(flags f) { m_value = f.m_value; return *this; }
 	flags& operator +=(flags f) { m_value += f.m_value; return *this; }
@@ -42,12 +43,16 @@ public:
 	flags& operator &=(flags f) { m_value &= f.m_value; return *this; }
 
 	flags& operator =(underlying_type value) { m_value = value; return *this;}
-	
+
 	constexpr underlying_type get() const
 	{
 		return m_value;
 	}
-	constexpr operator bool() const
+	constexpr bool operator !() const
+	{
+		return !m_value;
+	}
+	explicit constexpr operator bool() const
 	{
 		return m_value;
 	}
@@ -56,6 +61,12 @@ public:
 		return m_value;
 	}
 };
+
+template <typename EnumT>
+std::ostream& operator << (std::ostream& s, flags<EnumT> f)
+{
+	return s << f.get();
+}
 
 template<typename E>
 constexpr flags<E> make_flags(E e)

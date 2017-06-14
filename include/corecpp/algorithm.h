@@ -70,6 +70,34 @@ namespace corecpp
 		return res;
 	}
 
+	template <typename ContainerT>
+	bool starts_with(const ContainerT& haystack, const ContainerT& needle)
+	{
+		auto pos = haystack.begin();
+		auto el = needle.begin();
+		while (el != needle.end() && pos != haystack.end())
+		{
+			if (*el != *pos)
+				return false;
+			++el; ++pos;
+		}
+		return (el == needle.end());
+	}
+
+	template <typename ContainerT>
+	bool ends_with(const ContainerT& haystack, const ContainerT& needle)
+	{
+		auto pos = haystack.end();
+		auto el = needle.end();
+		while (el != needle.begin() && pos != haystack.begin())
+		{
+			if (*el != *pos)
+				return false;
+			--el; --pos;
+		}
+		return (el == needle.begin());
+	}
+
 	template<typename StringT>
 	StringT toPascalCase(const StringT& in)
 	{
@@ -118,7 +146,7 @@ namespace corecpp
 			res[0] = std::tolower(res[0]);
 		return std::move(res);
 	}
-	
+
 	template<typename EnumT>
 	using enum_map = std::initializer_list<std::pair<EnumT, std::string>>;
 
@@ -132,7 +160,7 @@ namespace corecpp
 		}
 		throw std::logic_error("Unknow enum value");
 	}
-	
+
 	template<typename StringT, typename EnumT, typename MapT = enum_map<EnumT>>
 	static bool stoe(const StringT& str, EnumT& value, const MapT& mapping, std::locale l = std::locale())
 	{

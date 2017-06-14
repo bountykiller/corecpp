@@ -63,7 +63,7 @@ public:
 		m_deleter = make_deleter<T>();
 		return *this;
 	}
-	
+
 	bool operator < (const any& other) const
 	{
 		return m_data < other.m_data;
@@ -78,7 +78,7 @@ public:
 	template<typename T>
 	const T& get() const
 	{
-		return *(static_cast<T*>(m_data));
+		return *(static_cast<const T*>(m_data));
 	}
 	void clear()
 	{

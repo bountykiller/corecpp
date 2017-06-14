@@ -131,11 +131,19 @@ public:
 	}
 
 	template<class VisitorT, typename... ArgsT>
+	auto apply(VisitorT&& visitor, ArgsT&&... args) const
+	{
+		variant_apply<const variant<TArgs...>, sizeof...(TArgs) - 1, VisitorT, ArgsT...> applier;
+		return applier(*this, std::forward<VisitorT>(visitor), std::forward<ArgsT>(args)...);
+	}
+
+	template<class VisitorT, typename... ArgsT>
 	auto apply(VisitorT&& visitor, ArgsT&&... args)
 	{
 		variant_apply<variant<TArgs...>, sizeof...(TArgs) - 1, VisitorT, ArgsT...> applier;
 		return applier(*this, std::forward<VisitorT>(visitor), std::forward<ArgsT>(args)...);
 	}
+
 };
 
 }

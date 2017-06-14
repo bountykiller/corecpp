@@ -7,6 +7,12 @@
 namespace corecpp
 {
 
+/**
+ * @brief this class is intented to facilitate the use of an object which is already
+ * owned somewhere else.
+ * \warning since this class doesn't owns his data, a ref_ptr becomes invalid
+ * as soon as the data it points to is deleted
+ */
 template<typename _T>
 class ref_ptr final
 {
@@ -14,10 +20,17 @@ public:
 	using element_type = typename std::remove_reference<_T>::type;
 	using reference_type = typename std::add_lvalue_reference<_T>::type;
 	using pointer = typename std::add_pointer<_T>::type;
+	using const_pointer = typename std::add_const<pointer>::type;
 
+private:
+	pointer m_ptr;
+
+public:
 	ref_ptr() = default;
 	ref_ptr(const ref_ptr&) = default;
-
+	explicit ref_ptr(const_pointer ptr)
+	: m_ptr(ptr)
+	{}
 	template<typename _Tp>
 	ref_ptr(const _Tp& ptr)
 	: m_ptr(ptr.get())
@@ -25,10 +38,14 @@ public:
 
 	reference_type operator* () const
 	{
+#if DEBUG
 		if(m_ptr)
 			return *m_ptr;
 		else
 			throw std::logic_error("trying to dereference a null pointer");
+#else
+		return *m_ptr;
+#endif
 	}
 	pointer operator ->() const
 	{
@@ -65,8 +82,6 @@ public:
 	{
 		return m_ptr;
 	}
-private:
-	pointer m_ptr;
 };
 
 
