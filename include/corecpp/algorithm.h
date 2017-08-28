@@ -73,29 +73,33 @@ namespace corecpp
 	template <typename ContainerT>
 	bool starts_with(const ContainerT& haystack, const ContainerT& needle)
 	{
+		if (haystack.size() < needle.size())
+			return false;
 		auto pos = haystack.begin();
 		auto el = needle.begin();
-		while (el != needle.end() && pos != haystack.end())
+		while (el != needle.end())
 		{
 			if (*el != *pos)
 				return false;
 			++el; ++pos;
 		}
-		return (el == needle.end());
+		return true;
 	}
 
 	template <typename ContainerT>
 	bool ends_with(const ContainerT& haystack, const ContainerT& needle)
 	{
-		auto pos = haystack.end();
-		auto el = needle.end();
-		while (el != needle.begin() && pos != haystack.begin())
+		if (haystack.size() < needle.size())
+			return false;
+		auto pos = haystack.rbegin();
+		auto el = needle.rbegin();
+		while (el != needle.rend())
 		{
 			if (*el != *pos)
 				return false;
-			--el; --pos;
+			++el; ++pos;
 		}
-		return (el == needle.begin());
+		return true;
 	}
 
 	template<typename StringT>
