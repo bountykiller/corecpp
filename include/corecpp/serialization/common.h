@@ -6,7 +6,7 @@
 #include <typeinfo>
 #include <type_traits>
 
-#include "../meta/extensions.h"
+#include <corecpp/meta/extensions.h>
 
 namespace corecpp
 {
