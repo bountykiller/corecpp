@@ -50,7 +50,10 @@ template<typename T>
 using concrete = typename type_resolver<T>::type;
 
 
-
+/**
+ * @class is_iterable
+ * @brief allows to know of a class can be browsed through an iterator
+ */
 template<typename T, typename Enable = void>
 struct is_iterable
 {
@@ -66,6 +69,27 @@ struct is_iterable<T, typename std::enable_if<!std::is_void<typename T::iterator
 	static constexpr bool value = true;
 };
 
+/**
+ * @class is_dereferencable
+ * @brief allows to know of a class can be derefenced through the * or the -> operators
+ */
+template<typename T, typename Enable = void>
+struct is_dereferencable
+{
+	static constexpr bool value = false;
+};
+template<typename T>
+struct is_dereferencable<T, typename std::enable_if<std::is_pointer<T>::value>::type>
+{
+	static constexpr bool value = true;
+};
+template<typename T>
+struct is_dereferencable<T,
+					typename std::enable_if<std::is_member_function_pointer<decltype(&T::operator*)>::value
+										&& std::is_member_function_pointer<decltype(&T::operator->)>::value>::type>
+{
+	static constexpr bool value = true;
+};
 
 }
 
