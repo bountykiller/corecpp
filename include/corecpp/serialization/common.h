@@ -6,7 +6,7 @@
 #include <typeinfo>
 #include <type_traits>
 
-#include <corecpp/meta/extensions.h>
+#include "../meta/extensions.h"
 
 namespace corecpp
 {
@@ -52,6 +52,18 @@ namespace corecpp
 	};
 	template <typename SerializerT, typename ValueT>
 	struct serialize_impl<SerializerT, ValueT,
+						typename std::enable_if<corecpp::is_dereferencable<typename std::decay<ValueT>::type>::value>::type>
+	{
+		void operator () (SerializerT& s, ValueT&& value)
+		{
+			if (value)
+				s.serialize(*value);
+			else
+				s.serialize(nullptr);
+		}
+	};
+	template <typename SerializerT, typename ValueT>
+	struct serialize_impl<SerializerT, ValueT,
 						typename std::enable_if<
 							is_serializable<typename std::decay<ValueT>::type, typename std::decay<SerializerT>::type>::value>
 						::type>
@@ -59,7 +71,7 @@ namespace corecpp
 		void operator () (SerializerT& s, ValueT&& value)
 		{
 			s.template begin_object<ValueT>();
-			value.serialize(s);
+			s.serialize(std::forward<ValueT>(value));
 			s.end_object();
 		}
 	};
@@ -81,6 +93,16 @@ namespace corecpp
 		void operator () (DeserializerT& d, ValueT& value)
 		{
 			d.read_object(value, std::remove_reference<ValueT>::type::properties());
+		}
+	};
+	template <typename DeserializerT, typename ValueT>
+	struct deserialize_impl<DeserializerT, ValueT,
+	typename std::enable_if<corecpp::is_dereferencable<typename std::decay<ValueT>::type>::value>::type>
+	{
+		void operator () (DeserializerT& d, ValueT& value)
+		{
+			value = ValueT(new typename std::remove_reference<decltype(*value)>::type());
+			d.deserialize(*value);
 		}
 	};
 	template <typename DeserializerT, typename ValueT>

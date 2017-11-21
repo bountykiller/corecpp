@@ -67,9 +67,9 @@ namespace corecpp
 		{};
 
 		using token = corecpp::variant<open_brace_token, close_brace_token, open_bracket_token, close_bracket_token,
-										comma_token, dot_token, colon_token,
-										string_token, numeric_token, integral_token,
-										null_token, true_token, false_token>;
+		comma_token, dot_token, colon_token,
+		string_token, numeric_token, integral_token,
+		null_token, true_token, false_token>;
 
 		std::string to_string(const token& tk);
 
@@ -183,7 +183,7 @@ namespace corecpp
 				for (auto& member : members)
 					if (member.name.value == key)
 						return (member.value = std::forward<ValueT>(value));
-				members.emplace_back(key, std::forward<ValueT>(value));
+					members.emplace_back(key, std::forward<ValueT>(value));
 				return members.back().value;
 			}
 			value_node& at (const std::wstring& key)
@@ -191,14 +191,14 @@ namespace corecpp
 				for (auto& value : members)
 					if (value.name.value == key)
 						return value.value;
-				throw std::overflow_error(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
+					throw std::overflow_error(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
 			}
 			const value_node& at (const std::wstring& key) const
 			{
 				for (const auto& value : members)
 					if (value.name.value == key)
 						return value.value;
-				throw std::overflow_error(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
+					throw std::overflow_error(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
 			}
 		};
 		static inline auto begin(object_node& o) { return std::begin(o.members); }

@@ -50,7 +50,7 @@ struct complex_type
 	double value;
 	std::string symbol;
 	template <typename SerializerT>
-	void serialize(SerializerT& s)
+	void serialize(SerializerT& s) const
 	{
 		s.write_property("name", symbol.c_str());
 		s.write_property("value", value);
