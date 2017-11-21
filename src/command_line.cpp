@@ -10,66 +10,146 @@
 namespace corecpp
 {
 
-void command_line::load(int argc, char** argv)
+corecpp::diagnostic::event_producer& command_line_parser::logger()
 {
-	int i = 1;
-	while(i < argc)
+	static auto& channel = corecpp::diagnostic::manager::get_channel("command_line_parser");
+	static auto logger = corecpp::diagnostic::event_producer(channel);
+	return logger;
+}
+
+void command_line_parser::parse_options(void)
+{
+	while(const char* token = m_command_line.peek())
 	{
-		std::string param_name(argv[i]);
-		i++;
-		if(param_name.substr(0,2) == "--")
+		if (*token != '-')
+			break;
+		std::string param(m_command_line.read());
+		logger().trace(corecpp::concat<std::string>({"parsing ", param}), __FILE__, __LINE__);
+		if(param.substr(0,2) == "--")
 		{
-			std::string param_value = (i == argc) ? "" : argv[i];
-			param_name = param_name.substr(2);
-			if(param_value[0] == '-')
-				param_value = ""; //param with no value => value is set to empty_string
+			std::string value = "";
+			auto pos = param.find('=');
+			if(pos == std::string::npos)
+			{
+				//param with no value => value is let to an empty string
+				param = param.substr(2);
+			}
 			else
-				i++; //param with value => must skip one string
-			auto param = m_parameters_by_name.find(param_name);
-			if(param == m_parameters_by_name.end())
-				throw std::invalid_argument(param_name);
-			param->second->read_value(param_value);
+			{
+				value = param.substr(pos);
+				param = param.substr(2, param.length() - 2 - pos);
+			}
+			auto option = get_option(param);
+			if (option == m_options.end())
+				throw std::invalid_argument(param);
+			if (option->require_value() && (pos == std::string::npos))
+				throw value_error(param);
+			option->read(value);
 		}
-		else if(param_name[0] == '-')
+		else if(param[0] == '-')
 		{
-			param_name = param_name.substr(1);
-			std::string param_value = (i == argc) ? "" : argv[i];
-			if(param_value[0] == '-')
-				param_value = "";
-			else
-				i++;
+			param = param.substr(1);
+			const char* value = m_command_line.peek();
+			if(*value == '-') //another option
+				value = nullptr;
 			//for loop because we can have multiple params
-			for(std::string::const_iterator iter = param_name.begin();
-				iter != param_name.end(); )
+			for(auto iter = param.begin(); iter != param.end(); )
 			{
 				char shortname = *iter;
-				auto param = m_parameters_by_shortname.find(shortname);
-				if(param == m_parameters_by_shortname.end())
+				auto option = get_option(shortname);
+				if(option == m_options.end())
 					throw std::invalid_argument(std::string(1, shortname));
-				if(++iter == param_name.end())//last param => must give the value to it
-					param->second->read_value(param_value);
-				else //not the last parameter => we suppose he doesn't need a value
-					param->second->read_value("");
+
+				if (++iter == param.end())//last option => must give the value to it
+				{
+					if (!value && option->require_value())
+						throw value_error(param);
+					option->read(m_command_line.read());
+				}
+				else //not the last parameter => should not need a value
+				{
+					if (option->require_value())
+						throw value_error(param);
+					option->read("");
+				}
 			}
 		}
-		/**
-		else
-		{
-			for now, do nothing
-		}
-		*/
 	}
 }
 
-void command_line::usage()
+void command_line_parser::usage()
 {
-	for (const auto& sumary : m_parameters_summary)
+	std::cout << "Usage : " << m_command_line.program() << m_command_line.commands();
+	if (m_options.size() > 0)
+		std::cout << " [<options>]";
+	if (m_commands.size() > 0)
+		std::cout << " <command>";
+	for (const auto& param : m_params)
 	{
-		if(!sumary.shortname)
-			std::cout << "\t--" << sumary.name << '\t' << sumary.helpmsg << std::endl;
+		if (param.is_required())
+			std::cout << " <" << param.name() << '>';
 		else
-			std::cout << "\t-" << sumary.shortname << ", --" << sumary.name << '\t' << sumary.helpmsg << std::endl;
+			std::cout << " [<" << param.name() << ">]";
 	}
+
+	if (m_options.size() > 0)
+	{
+		std::cout << "\nOptions:\n";
+		for (const auto& option : m_options)
+		{
+			std::cout << option.helpmsg() << '\n';
+		}
+	}
+
+	if (m_commands.size() > 0)
+	{
+		std::cout << "\nCommands:\n";
+		for (const auto& command : m_commands)
+		{
+			std::cout << command.helpmsg() << '\n';
+		}
+	}
+
+	if (m_params.size() > 0)
+	{
+		std::cout << "\nParameters:\n";
+		for (const auto& param : m_params)
+		{
+			std::cout << param.helpmsg() << '\n';
+		}
+	}
+	std::cout << std::endl;
+}
+
+void command_line_parser::parse_parameters(void)
+{
+	for (const auto& parameter : m_params)
+	{
+		const char* token = m_command_line.read();
+		if (!token)
+		{
+			if (parameter.is_required())
+				throw value_error(parameter.name());
+			else
+				return;
+		}
+		parameter.read(token);
+	}
+}
+
+int command_line_parser::execute()
+{
+	const char* command = m_command_line.read();
+	if (!command) // all parameter have already been read
+		return -1;
+
+	auto cmd = get_command(command);
+	if (cmd == m_commands.end())
+		return -1;
+
+	logger().trace(corecpp::concat<std::string>({"calling ", command}), __FILE__, __LINE__);
+	m_command_line.store_command();
+	return cmd->execute(m_command_line);
 }
 
 }

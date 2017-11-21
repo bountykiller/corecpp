@@ -4,6 +4,7 @@
 #include <iostream>
 #include <typeinfo>
 #include <typeinfo>
+#include <type_traits>
 #include <initializer_list>
 #include <stdexcept>
 #include <string>
@@ -201,6 +202,11 @@ auto make_property(StringT&& name, ValueT&& value)
 	return property<ValueT>(std::forward<StringT>(name), std::forward<ValueT>(value));
 }
 
+template <typename EnumT>
+auto underlying_value(EnumT e)
+{
+	return static_cast<std::underlying_type_t<EnumT>>(e);
+}
 
 }
 
