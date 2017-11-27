@@ -56,9 +56,9 @@ namespace corecpp
 				m_condition.wait(lock, [&] { return !m_container.empty(); });
 				m_container.pop_front();
 			}
-			template<typename T, typename =
-			typename std::enable_if<std::is_move_assignable<T>::value, T>::type>
-			bool pop(T& out)
+			template<typename T,
+					typename = typename std::enable_if<std::is_move_assignable<T>::value, T>::type>
+			bool try_pop(T& out)
 			{
 				std::unique_lock<std::mutex> lock(m_mutex);
 				if (m_container.empty())
@@ -68,17 +68,7 @@ namespace corecpp
 				return true;
 			}
 			template<typename T>
-			bool pop(typename std::enable_if<std::is_copy_assignable<T>::value, T>::type& out)
-			{
-				std::unique_lock<std::mutex> lock(m_mutex);
-				if (m_container.empty())
-					return false;
-				out = m_container.front();
-				m_container.pop_front();
-				return true;
-			}
-			template<typename T, typename = typename std::enable_if<std::is_assignable<T, value_type>::value>::type>
-			bool pop_try(T& out)
+			bool try_pop(typename std::enable_if<std::is_copy_assignable<T>::value, T>::type& out)
 			{
 				std::unique_lock<std::mutex> lock(m_mutex);
 				if (m_container.empty())
@@ -88,8 +78,7 @@ namespace corecpp
 				return true;
 			}
 			template<typename T, class Rep, class Period,
-					typename CopyCtrArgT = typename std::add_rvalue_reference<value_type>::type,
-					typename  = typename std::enable_if<std::is_assignable<T, CopyCtrArgT>::value>::type>
+					typename  = typename std::enable_if<std::is_move_assignable<T>::value, T>::type>
 			bool pop_for(T& out, const std::chrono::duration<Rep, Period>& rel_time)
 			{
 				std::unique_lock<std::mutex> lock(m_mutex);
@@ -99,9 +88,8 @@ namespace corecpp
 				m_container.pop_front();
 				return true;
 			}
-			template<typename T, class Rep, class Period,
-					typename = typename std::enable_if<std::is_assignable<T, value_type>::value>::type>
-			bool pop_for(T& out, const std::chrono::duration<Rep, Period>& rel_time)
+			template<typename T, class Rep, class Period>
+			bool pop_for(typename std::enable_if<std::is_copy_assignable<T>::value, T>::type& out, const std::chrono::duration<Rep, Period>& rel_time)
 			{
 				std::unique_lock<std::mutex> lock(m_mutex);
 				if (!m_condition.wait_for(lock, rel_time, [&] { return !m_container.empty(); }))
@@ -111,8 +99,7 @@ namespace corecpp
 				return true;
 			}
 			template<typename T, class Rep, class Period,
-					typename CopyCtrArgT = typename std::add_rvalue_reference<value_type>::type,
-					typename  = typename std::enable_if<std::is_assignable<T, CopyCtrArgT>::value>::type>
+					typename  = typename std::enable_if<std::is_move_assignable<T>::value, T>::type>
 			bool pop_until(T& out, const std::chrono::duration<Rep, Period>& rel_time)
 			{
 				std::unique_lock<std::mutex> lock(m_mutex);
@@ -122,9 +109,8 @@ namespace corecpp
 				m_container.pop_front();
 				return true;
 			}
-			template<typename T, class Rep, class Period,
-					typename = typename std::enable_if<std::is_assignable<T, value_type>::value>::type>
-			bool pop_until(T& out, const std::chrono::duration<Rep, Period>& rel_time)
+			template<typename T, class Rep, class Period>
+			bool pop_until(typename std::enable_if<std::is_copy_assignable<T>::value, T>::type& out, const std::chrono::duration<Rep, Period>& rel_time)
 			{
 				std::unique_lock<std::mutex> lock(m_mutex);
 				if (!m_condition.wait_until(lock, rel_time, [&] { return !m_container.empty(); }))

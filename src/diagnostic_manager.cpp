@@ -9,7 +9,11 @@ namespace diagnostic
 {
 
 
-manager manager::m_instance;
+manager& manager::instance()
+{
+	static manager res;
+	return res;
+}
 
 static const corecpp::enum_map<diagnostic_level> diagnostic_level_strings =
 {
