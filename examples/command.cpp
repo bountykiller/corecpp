@@ -1,8 +1,7 @@
 #include <iostream>
+#include "../include/corecpp/diagnostic.h"
 #include "../include/corecpp/command_line.h"
 //#include <corecpp/meta/validator.h>
-
-unsigned int g_verbosity = 0;
 
 int add(corecpp::command_line& line)
 {
@@ -76,12 +75,13 @@ int divise(corecpp::command_line& line)
 
 int main(int argc, char** argv)
 {
+	unsigned int verbosity = 0;
 	bool show_help = false;
 	corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::debug);
 	corecpp::command_line args { argc, argv };
 	corecpp::command_line_parser commands { args };
 	commands.add_options(
-		corecpp::program_option { 'v', "verbose", "enable verbose", g_verbosity },
+		corecpp::program_option { 'v', "verbose", "enable verbose", verbosity },
 		corecpp::program_option { 'h', "help", "show help message", show_help }
 	);
 	commands.add_commands(
@@ -92,20 +92,20 @@ int main(int argc, char** argv)
 
 	commands.parse_options();
 
-	if (show_help)
-	{
-		commands.usage();
-		return show_help ? EXIT_SUCCESS : EXIT_FAILURE;
-	}
-
-	if (g_verbosity >= 3)
+	if (verbosity >= 3)
 		corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::debug);
-	else if (g_verbosity == 2)
+	else if (verbosity == 2)
 		corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::trace);
-	else if (g_verbosity == 1)
+	else if (verbosity == 1)
 		corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::info);
 	else
 		corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::success);
+
+	if (show_help)
+	{
+		commands.usage();
+		return EXIT_SUCCESS;
+	}
 
 	int ret_code = commands.execute();
 	if (ret_code >= 0)

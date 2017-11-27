@@ -25,7 +25,7 @@ void command_line_parser::parse_options(void)
 			break;
 		std::string param(m_command_line.read());
 		logger().trace(corecpp::concat<std::string>({"parsing ", param}), __FILE__, __LINE__);
-		if(param.substr(0,2) == "--")
+		if (param.substr(0,2) == "--")
 		{
 			std::string value = "";
 			auto pos = param.find('=');
@@ -46,11 +46,11 @@ void command_line_parser::parse_options(void)
 				throw value_error(param);
 			option->read(value);
 		}
-		else if(param[0] == '-')
+		else if (param[0] == '-')
 		{
 			param = param.substr(1);
 			const char* value = m_command_line.peek();
-			if(*value == '-') //another option
+			if(value && *value == '-') //another option
 				value = nullptr;
 			//for loop because we can have multiple params
 			for(auto iter = param.begin(); iter != param.end(); )

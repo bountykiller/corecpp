@@ -14,6 +14,9 @@
 #include <corecpp/diagnostic.h>
 
 
+/* TODO: Manage options groups
+ */
+
 namespace corecpp
 {
 	struct value_error : std::invalid_argument

@@ -200,20 +200,20 @@ public:
 		m_params = std::move(other.m_params);
 		return *this;
 	}
-	
+
 	void swap(channel& other)
 	{
 		std::lock_guard<std::mutex> lock(m_mutex);
 		std::lock_guard<std::mutex> other_lock(other.m_mutex);
 		std::swap(m_params, other.m_params);
 	}
-	
+
 	void set_level(diagnostic_level value)
 	{
 		std::lock_guard<std::mutex> lock(m_mutex);
 		m_params->level = value;
 	}
-	
+
 	void diagnose(diagnostic_level level, std::string message, std::string file, uint line);
 	void diagnose(diagnostic_level level, std::string message, std::string details, std::string file, uint line);
 	void diagnose(diagnostic_level level, std::string message, std::function<std::string()> details, std::string file, uint line);
@@ -226,7 +226,7 @@ class manager
 	std::unique_ptr<channel> m_default;
 	std::unordered_map<std::string, channel> m_channels;
 	std::mutex m_mutex;
-	static manager m_instance;
+	static manager& instance();
 	channel& _get_channel(const std::string& name);
 	channel& _default_channel();
 	manager() = default;
@@ -234,16 +234,16 @@ public:
 	template <typename T>
 	static channel& get_channel(T&& name)
 	{
-		return m_instance._get_channel(std::forward<T>(name));
+		return instance()._get_channel(std::forward<T>(name));
 	}
 	static void set_default(diagnostic_level level, appender& app)
 	{
-		std::lock_guard<std::mutex> lock(m_instance.m_mutex);
-		m_instance.m_default.reset(new channel(level, app));
+		std::lock_guard<std::mutex> lock(instance().m_mutex);
+		instance().m_default.reset(new channel(level, app));
 	}
 	static channel& default_channel()
 	{
-		return m_instance._default_channel();
+		return instance()._default_channel();
 	}
 };
 
@@ -267,7 +267,7 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::fatal, std::move(message), std::move(details), std::move(file), line);
 	}
-	
+
 	void error(std::string message, std::string file, uint line) const
 	{
 		m_channel.diagnose(diagnostic_level::error, std::move(message), std::move(file), line);
@@ -280,7 +280,7 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::error, std::move(message), std::move(details), std::move(file), line);
 	}
-	
+
 	void warn(std::string message, std::string file, uint line) const
 	{
 		m_channel.diagnose(diagnostic_level::warning, std::move(message), std::move(file), line);
@@ -293,7 +293,7 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::warning, std::move(message), std::move(details), std::move(file), line);
 	}
-	
+
 	void fail(std::string message, std::string file, uint line) const
 	{
 		m_channel.diagnose(diagnostic_level::faillure, std::move(message), std::move(file), line);
@@ -306,7 +306,7 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::faillure, std::move(message), std::move(details), std::move(file), line);
 	}
-	
+
 	void success(std::string message, std::string file, uint line) const
 	{
 		m_channel.diagnose(diagnostic_level::success, std::move(message), std::move(file), line);
@@ -319,7 +319,7 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::success, std::move(message), std::move(details), std::move(file), line);
 	}
-	
+
 	void info(std::string message, std::string file, uint line) const
 	{
 		m_channel.diagnose(diagnostic_level::info, std::move(message), std::move(file), line);
@@ -332,7 +332,7 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::info, std::move(message), std::move(details), std::move(file), line);
 	}
-	
+
 	void trace(std::string message, std::string file, uint line) const
 	{
 		m_channel.diagnose(diagnostic_level::trace, std::move(message), std::move(file), line);
@@ -345,7 +345,7 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::trace, std::move(message), std::move(details), std::move(file), line);
 	}
-	
+
 	void debug(std::string message, std::string file, uint line) const
 	{
 		m_channel.diagnose(diagnostic_level::debug, std::move(message), std::move(file), line);

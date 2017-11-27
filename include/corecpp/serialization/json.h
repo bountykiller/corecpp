@@ -448,7 +448,7 @@ namespace corecpp
 			void write_array(ValueT&& value)
 			{
 				begin_array<ValueT>();
-				for (auto item : value)
+				for (auto&& item : value)
 					write_element(item);
 				end_array();
 			}
