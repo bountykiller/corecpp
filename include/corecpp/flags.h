@@ -67,6 +67,34 @@ std::ostream& operator << (std::ostream& s, flags<EnumT> f)
 {
 	return s << f.get();
 }
+template<typename E>
+constexpr typename std::enable_if<std::is_enum<E>::value, flags<E>>::type
+operator + (E e, E e2)
+{
+	return flags<E>(e) + flags<E>(e2);
+}
+
+template<typename E>
+constexpr typename std::enable_if<std::is_enum<E>::value, flags<E>>::type
+operator - (E e, E e2)
+{
+	return flags<E>(e) - flags<E>(e2);
+}
+
+template<typename E>
+constexpr typename std::enable_if<std::is_enum<E>::value, flags<E>>::type
+operator | (E e, E e2)
+{
+	return flags<E>(e) | flags<E>(e2);
+}
+
+template<typename E>
+constexpr typename std::enable_if<std::is_enum<E>::value, flags<E>>::type
+operator & (E e, E e2)
+{
+	return flags<E>(e) & flags<E>(e2);
+}
+
 
 template<typename E>
 constexpr flags<E> make_flags(E e)
