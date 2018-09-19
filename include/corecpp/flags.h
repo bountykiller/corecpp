@@ -20,29 +20,35 @@ public:
 	{}
 	explicit constexpr flags(underlying_type e = 0) : m_value(e)
 	{}
-	constexpr flags operator +(EnumT e) const { return flags( m_value + static_cast<underlying_type>(e)); }
-	constexpr flags operator -(EnumT e) const { return flags( m_value - static_cast<underlying_type>(e)); }
+	constexpr flags operator +(EnumT e) const { return flags( m_value + static_cast<underlying_type>(e)); } /* or should it be m_value | static_cast<underlying_type>(e));  ?*/
+	constexpr flags operator -(EnumT e) const { return flags( m_value - static_cast<underlying_type>(e)); } /* or should it be m_value & ~static_cast<underlying_type>(e)); ?*/
 	constexpr flags operator |(EnumT e) const { return flags( m_value | static_cast<underlying_type>(e)); }
 	constexpr flags operator &(EnumT e) const { return flags( m_value & static_cast<underlying_type>(e)); }
+	constexpr flags operator ^(EnumT e) const { return flags( m_value ^ static_cast<underlying_type>(e)); }
 
 	constexpr flags operator +(flags f) const { return flags(m_value + f.m_value); }
 	constexpr flags operator -(flags f) const { return flags(m_value - f.m_value); }
 	constexpr flags operator |(flags f) const { return flags(m_value | f.m_value); }
 	constexpr flags operator &(flags f) const { return flags(m_value & f.m_value); }
+	constexpr flags operator ^(flags f) const { return flags(m_value ^ f.m_value); }
 
-	flags& operator =(EnumT e) { m_value = static_cast<underlying_type>(e); return *this;}
+	flags& operator =(EnumT e) { m_value = static_cast<underlying_type>(e); return *this; }
 	flags& operator +=(EnumT e) { m_value += static_cast<underlying_type>(e); return *this; }
 	flags& operator -=(EnumT e) { m_value -= static_cast<underlying_type>(e); return *this; }
 	flags& operator |=(EnumT e) { m_value |= static_cast<underlying_type>(e); return *this; }
 	flags& operator &=(EnumT e) { m_value &= static_cast<underlying_type>(e); return *this; }
+	flags& operator ^=(EnumT e) { m_value ^= static_cast<underlying_type>(e); return *this; }
 
 	flags& operator =(flags f) { m_value = f.m_value; return *this; }
 	flags& operator +=(flags f) { m_value += f.m_value; return *this; }
 	flags& operator -=(flags f) { m_value -= f.m_value; return *this; }
 	flags& operator |=(flags f) { m_value |= f.m_value; return *this; }
 	flags& operator &=(flags f) { m_value &= f.m_value; return *this; }
+	flags& operator ^=(flags f) { m_value ^= f.m_value; return *this; }
 
-	flags& operator =(underlying_type value) { m_value = value; return *this;}
+	flags& operator =(underlying_type value) { m_value = value; return *this; }
+
+	constexpr flags operator ~() const { return ~m_value; }
 
 	constexpr underlying_type get() const
 	{
@@ -93,6 +99,20 @@ constexpr typename std::enable_if<std::is_enum<E>::value, flags<E>>::type
 operator & (E e, E e2)
 {
 	return flags<E>(e) & flags<E>(e2);
+}
+
+template<typename E>
+constexpr typename std::enable_if<std::is_enum<E>::value, flags<E>>::type
+operator ^ (E e, E e2)
+{
+	return flags<E>(e) ^ flags<E>(e2);
+}
+
+template<typename E>
+constexpr typename std::enable_if<std::is_enum<E>::value, flags<E>>::type
+operator ~ (E e)
+{
+	return ~flags<E>(e);
 }
 
 
