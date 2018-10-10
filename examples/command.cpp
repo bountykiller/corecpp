@@ -1,6 +1,6 @@
 #include <iostream>
-#include "../include/corecpp/diagnostic.h"
-#include "../include/corecpp/command_line.h"
+#include <corecpp/diagnostic.h>
+#include <corecpp/command_line.h>
 //#include <corecpp/meta/validator.h>
 
 int add(corecpp::command_line& line)

@@ -71,7 +71,7 @@ namespace corecpp
 		void operator () (SerializerT& s, ValueT&& value)
 		{
 			s.template begin_object<ValueT>();
-			s.serialize(std::forward<ValueT>(value));
+			value.serialize(s);
 			s.end_object();
 		}
 	};

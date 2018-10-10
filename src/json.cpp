@@ -401,6 +401,7 @@ shift_result object_rule::shift(token&& tk)
 			}
 		}
 		case status::end:
+		default:
 			return { false, nullptr };
 	}
 }
@@ -452,6 +453,7 @@ shift_result array_rule::shift(token&& tk)
 			}
 		}
 		case status::end:
+		default:
 			return { false, nullptr };
 	}
 }

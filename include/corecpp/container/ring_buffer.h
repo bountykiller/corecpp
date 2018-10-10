@@ -25,6 +25,7 @@ namespace corecpp
 			auto pos = m_first + m_count;
 			if (pos >= m_capacity)
 				pos -= m_capacity;
+			return pos;
 		}
 
 		std::size_t last()
@@ -32,6 +33,7 @@ namespace corecpp
 			auto pos = m_first + m_count - 1;
 			if (pos >= m_capacity)
 				pos -= m_capacity;
+			return pos;
 		}
 	public:
 		using value_type = ValueT;
@@ -121,7 +123,7 @@ namespace corecpp
 			++m_count;
 			return true;
 		}
-		bool push_back(const_reference_type other)
+		void push_back(const_reference_type other)
 		{
 			if (m_count >= m_capacity)
 				m_allocator.destroy(&m_buffer[next()]);
