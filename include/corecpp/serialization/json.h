@@ -313,7 +313,9 @@ namespace corecpp
 			node end();
 		};
 
-
+		/* TODO:
+		 * Add serialization/deserialization of char
+		 */
 		class serializer
 		{
 			std::ostream& m_stream;
@@ -336,6 +338,10 @@ namespace corecpp
 				m_stream << value;
 			}
 			void serialize(int64_t value)
+			{
+				m_stream << value;
+			}
+			void serialize(uint8_t value)
 			{
 				m_stream << value;
 			}
@@ -509,6 +515,10 @@ namespace corecpp
 				deserialize_integral(value);
 			}
 			void deserialize(int64_t& value)
+			{
+				deserialize_integral(value);
+			}
+			void deserialize(uint8_t& value)
 			{
 				deserialize_integral(value);
 			}
