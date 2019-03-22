@@ -64,7 +64,13 @@ void command_line_parser::parse_options(void)
 				{
 					if (!value && option->require_value())
 						throw value_error(param);
-					option->read(m_command_line.read());
+					if (option->require_value())
+					{
+						value = m_command_line.read(); //consume the parameter
+						option->read(value);
+					}
+					else
+						option->read("");
 				}
 				else //not the last parameter => should not need a value
 				{
