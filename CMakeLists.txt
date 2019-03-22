@@ -1,13 +1,13 @@
 project(corecpp)
 
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 3.1)
 
-SET(CMAKE_CXX_FLAGS "-std=c++14 -fPIC")
-SET(CORECPP_VERSION "0.3")
-SET(PKGCONFIG_DIR ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig)
-SET(CMAKE_DIR ${CMAKE_INSTALL_PREFIX}/lib/cmake/corecpp)
-SET(PKGCONFIG_FILES ${CMAKE_CURRENT_BINARY_DIR}/corecpp.pc)
-SET(CMAKE_FILES ${CMAKE_CURRENT_BINARY_DIR}/corecpp-config.cmake)
+set(CMAKE_CXX_STANDARD_REQUIRED 14)
+set(CORECPP_VERSION "0.3")
+set(PKGCONFIG_DIR ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig)
+set(CMAKE_DIR ${CMAKE_INSTALL_PREFIX}/lib/cmake/corecpp)
+set(PKGCONFIG_FILES ${CMAKE_CURRENT_BINARY_DIR}/corecpp.pc)
+set(CMAKE_FILES ${CMAKE_CURRENT_BINARY_DIR}/corecpp-config.cmake)
 
 # options
 option(BUILD_EXAMPLES "Build examples" ON)

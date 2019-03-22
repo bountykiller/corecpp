@@ -9,5 +9,8 @@ Here is some available class :
 - flags : class for manipulating enums as a list of flags
 - command_line : a class for making parameters managment more easy
 - uuid : lib for manipulating universally unique identifier (not available yet)
-- lazy : a class for easing lazy function evaluation (not available yet)
-- more to come...
+- deferred : a class for easing lazy function evaluation (not available yet)
+- event : simple class to ease event-oriented programming
+- shared_vector : a vector whose list of elements can be efficiently shared
+
+This library also feature both a serialization/deserialization framework and a logging framework.
