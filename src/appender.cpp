@@ -86,10 +86,10 @@ formatter::formatter(const std::string& format)
 	}
 }
 
-std::string formatter::format(const event& ev)
+std::string formatter::format(const event& ev) const
 {
 	std::string res;
-	for(formatter::format_fn_type& fn : m_functions)
+	for(const auto& fn : m_functions)
 		fn(res, ev);
 	return res;
 }

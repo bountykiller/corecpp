@@ -44,7 +44,7 @@ struct event
 {
 	diagnostic_level level;
 	std::string message;
-	std::string details;
+	std::string details; /* should we use a deferred object here? */
 	std::string file;
 	uint line;
 	std::chrono::system_clock::time_point timestamp;
@@ -70,7 +70,7 @@ struct formatter
 	std::vector<format_fn_type> m_functions;
 public:
 	formatter(const std::string& format);
-	std::string format(const event& ev);
+	std::string format(const event& ev) const;
 };
 
 
@@ -245,6 +245,8 @@ public:
 	{
 		return instance()._default_channel();
 	}
+	/* TODO: Add methods to register/unregister channels
+	 */
 };
 
 
@@ -359,6 +361,10 @@ public:
 		m_channel.diagnose(diagnostic_level::debug, std::move(message), std::move(details), std::move(file), line);
 	}
 };
+
+/* TODO: Add a defered_event_producer or somethig like that
+ * to allow storing events and writing them at the same time (on a process success/faillure for example)
+ */
 
 inline void swap(channel& a, channel& b)
 {
