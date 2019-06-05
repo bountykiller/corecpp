@@ -1,5 +1,6 @@
 add_subdirectory(container)
 add_subdirectory(serialization)
 add_subdirectory(meta)
+add_subdirectory(net)
 file(GLOB core_HEADERS *.h)
 install (FILES ${core_HEADERS} DESTINATION include/corecpp)
