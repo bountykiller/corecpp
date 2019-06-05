@@ -33,15 +33,14 @@ class shared_vector
 public:
 	using value_type = T;
 	using allocator_type = Allocator;
+	using allocator_trait = std::allocator_traits<allocator_type>;
 	using size_type = std::size_t;
 	using difference_type = std::ptrdiff_t;
 	using reference = value_type&;
 	using const_reference = const value_type&;
 	using pointer = typename std::allocator_traits<Allocator>::pointer;
 	using const_pointer = typename std::allocator_traits<Allocator>::const_pointer;
-	template<typename ContainerT, typename ValueT>
-	using iterator_type = contiguous_iterator<ContainerT, ValueT>;
-	using iterator = iterator_type<shared_vector<value_type, allocator_type>, value_type>;
+	using iterator = contiguous_iterator<shared_vector<value_type, allocator_type>, value_type>;
 	using const_iterator =  corecpp::const_iterator<iterator>;
 	using reverse_iterator = std::reverse_iterator<iterator>;
 	using const_reverse_iterator = std::reverse_iterator<const_iterator>;
@@ -90,26 +89,58 @@ public:
 	explicit shared_vector(size_type count, const Allocator& allocator = Allocator())
 	: m_block(new block { allocator, 1, next_power_of_2(count), count })
 	{
-		m_block->m_data = m_block->m_allocator.allocate(m_block->m_reserved);
-		for (auto i = count; count; --count)
+		size_type i = 0;
+		try
 		{
-			Allocator::construct(m_block->m_allocator, &m_block->m_data[i]);
+			m_block->m_data = m_block->m_allocator.allocate(m_block->m_reserved);
+			for (; i < count; ++i)
+				allocator_trait::construct(m_block->m_allocator, &m_block->m_data[i]);
+		}
+		catch (...)
+		{
+			while (i > 0)
+				allocator_trait::destroy(m_block->m_allocator, &m_block->m_data[--i]);
+
+			m_block->m_allocator.deallocate(m_block->m_data, m_block->m_reserved);
+			delete m_block;
+			throw;
+		}
+	}
+	template <typename... TArgs>
+	explicit shared_vector(size_type count, TArgs... args)
+	: m_block(new block { allocator_type(), 1, next_power_of_2(count), count })
+	{
+		size_type i = 0;
+		try
+		{
+			m_block->m_data = m_block->m_allocator.allocate(m_block->m_reserved);
+			for (; i < count; ++i)
+				allocator_trait::construct(m_block->m_allocator, &m_block->m_data[i], std::forward<TArgs>(args)...);
+		}
+		catch (...)
+		{
+			while (i > 0)
+				allocator_trait::destroy(m_block->m_allocator, &m_block->m_data[--i]);
+
+			m_block->m_allocator.deallocate(m_block->m_data, m_block->m_reserved);
+			delete m_block;
+			throw;
 		}
 	}
 	shared_vector(size_type count, const T& value, const Allocator& allocator = Allocator())
 	: m_block(new block { allocator, 1, next_power_of_2(count), count })
 	{
-		size_t i = 0;
+		size_type i = 0;
 		try
 		{
 			m_block->m_data = m_block->m_allocator.allocate(m_block->m_reserved);
 			for (; i < count; ++i)
-				Allocator::construct(m_block->m_allocator, &m_block->m_data[i], value);
+				allocator_trait::construct(m_block->m_allocator, &m_block->m_data[i], value);
 		}
 		catch (...)
 		{
 			while (i > 0)
-				Allocator::destroy(m_block->m_allocator, &m_block->m_data[--i]);
+				allocator_trait::destroy(m_block->m_allocator, &m_block->m_data[--i]);
 
 			m_block->m_allocator.deallocate(m_block->m_data, m_block->m_reserved);
 			delete m_block;
@@ -120,17 +151,17 @@ public:
 	shared_vector(InputIt first, InputIt last, const Allocator& allocator = Allocator())
 	: m_block(new block { allocator, 1, next_power_of_2(last - first), last - first })
 	{
-		size_t i = 0;
+		size_type i = 0;
 		try
 		{
 			m_block->m_data = m_block->m_allocator.allocate(m_block->m_reserved);
 			for (; first < last; ++first, ++i)
-				Allocator::construct(m_block->m_allocator, &m_block->m_data[i], *first);
+				allocator_trait::construct(m_block->m_allocator, &m_block->m_data[i], *first);
 		}
 		catch (...)
 		{
 			while (i > 0)
-				Allocator::destroy(m_block->m_allocator, &m_block->m_data[--i]);
+				allocator_trait::destroy(m_block->m_allocator, &m_block->m_data[--i]);
 
 			m_block->m_allocator.deallocate(m_block->m_data, m_block->m_reserved);
 			delete m_block;
@@ -150,23 +181,23 @@ public:
 		 * - other will still be pointing to his ownn block*
 		 * ==> all good!
 		 */
-		other.m_block = new block { m_block->allocator, 1, 0, 0 };
+		other.m_block = new block { m_block->m_allocator, 1, 0, 0 };
 	}
 
 	shared_vector(std::initializer_list<T> init, const Allocator& allocator = Allocator())
 	: m_block(new block { allocator, 1, next_power_of_2(init.size()), init.size() })
 	{
-		size_t i = 0;
+		size_type i = 0;
 		try
 		{
 			m_block->m_data = m_block->m_allocator.allocate(m_block->m_reserved);
 			for (; i < init.size(); ++i)
-				Allocator::construct(m_block->m_allocator, &m_block->m_data[i], init[i]);
+				allocator_trait::construct(m_block->m_allocator, &m_block->m_data[i], init[i]);
 		}
 		catch (...)
 		{
 			while (i > 0)
-				Allocator::destroy(m_block->m_allocator, &m_block->m_data[--i]);
+				allocator_trait::destroy(m_block->m_allocator, &m_block->m_data[--i]);
 
 			m_block->m_allocator.deallocate(m_block->m_data, m_block->m_reserved);
 			delete m_block;
@@ -265,8 +296,8 @@ public:
 		for (size_type i = 0; i < m_block->m_size; ++i)
 		{
 			/* throwing here is UB */
-			Allocator::construct(m_block->m_allocator, &new_data[i], std::move(m_block[i]));
-			Allocator::destroy(m_block->m_allocator, m_block[i]);
+			allocator_trait::construct(m_block->m_allocator, &new_data[i], std::move(m_block->m_data[i]));
+			allocator_trait::destroy(m_block->m_allocator, &m_block->m_data[i]);
 		}
 		m_block->m_allocator.deallocate(m_block->m_data, m_block->m_reserved);
 		m_block->m_data = new_data;
@@ -277,31 +308,31 @@ public:
 	void emplace_back(TArgs&&... args)
 	{
 		reserve(size() + 1);
-		Allocator::construct(m_block->m_allocator, &m_block->m_data[size()], std::forward<TArgs>(args)...);
+		allocator_trait::construct(m_block->m_allocator, &m_block->m_data[size()], std::forward<TArgs>(args)...);
 		m_block->m_size++;
 	}
 
 	void push_back(const T& value)
 	{
 		reserve(size() + 1);
-		Allocator::construct(m_block->m_allocator, &m_block->m_data[size()], value);
+		allocator_trait::construct(m_block->m_allocator, &m_block->m_data[size()], value);
 		m_block->m_size++;
 	}
 	void push_back(T&& value)
 	{
 		reserve(size() + 1);
-		Allocator::construct(m_block->m_allocator, &m_block->m_data[size()], value);
+		allocator_trait::construct(m_block->m_allocator, &m_block->m_data[size()], value);
 		m_block->m_size++;
 	}
 	void pop_back()
 	{
-		Allocator::destroy(m_block->m_allocator, &m_block->m_data[size()]);
+		allocator_trait::destroy(m_block->m_allocator, &m_block->m_data[size()]);
 		m_block->m_size--;
 	}
 	void clear()
 	{
 		while(m_block->m_size > 0)
-			Allocator::destroy(m_block->m_allocator, &m_block->m_data[--m_block->m_size]);
+			allocator_trait::destroy(m_block->m_allocator, &m_block->m_data[--m_block->m_size]);
 		m_block->m_allocator.deallocate(m_block->m_data, m_block->m_reserved);
 		m_block->m_data = nullptr;
 		m_block->m_size = m_block->m_reserved = 0;
@@ -318,10 +349,10 @@ public:
 	void resize(size_type new_size)
 	{
 		while(m_block->m_size > new_size)
-			Allocator::destroy(m_block->m_allocator, &m_block->m_data[--m_block->m_size]);
+			allocator_trait::destroy(m_block->m_allocator, &m_block->m_data[--m_block->m_size]);
 		reserve(new_size);
 		while(m_block->m_size < new_size)
-			Allocator::construct(m_block->m_allocator, &m_block->m_data[m_block->m_size++]);
+			allocator_trait::construct(m_block->m_allocator, &m_block->m_data[m_block->m_size++]);
 	}
 	void shrink()
 	{
@@ -331,8 +362,8 @@ public:
 			for (size_type i = 0; i < m_block->m_size; ++i)
 			{
 				/* throwing here is UB */
-				Allocator::construct(m_block->m_allocator, &new_data[i], std::move(m_block[i]));
-				Allocator::destroy(m_block->m_allocator, m_block[i]);
+				allocator_trait::construct(m_block->m_allocator, &new_data[i], std::move(m_block->m_data[i]));
+				allocator_trait::destroy(m_block->m_allocator, &m_block->m_data[i]);
 			}
 			m_block->m_allocator.deallocate(m_block->m_data, m_block->m_reserved);
 			m_block->m_data = new_data;
@@ -358,28 +389,28 @@ public:
 	}
 	iterator begin() noexcept
 	{
-		return m_block->m_data;
+		return iterator(m_block->m_data);
 	}
 	const_iterator begin() const noexcept
 	{
-		return m_block->m_data;
+		return const_iterator(m_block->m_data);
 	}
 	const_iterator cbegin() const noexcept
 	{
-		return m_block->m_data;
+		return const_iterator(m_block->m_data);
 	}
 
 	iterator end() noexcept
 	{
-		return &m_block->m_data[size()];
+		return iterator(&m_block->m_data[size()]);
 	}
 	const_iterator end() const noexcept
 	{
-		return &m_block->m_data[size()];
+		return const_iterator(&m_block->m_data[size()]);
 	}
 	const_iterator cend() const noexcept
 	{
-		return &m_block->m_data[size()];
+		return const_iterator(&m_block->m_data[size()]);
 	}
 
 	/* RMQ: Calling front on an empty container is undefined.  */

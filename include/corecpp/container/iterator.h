@@ -18,6 +18,8 @@ public:
 	using difference_type = std::ptrdiff_t;
 	using reference = typename std::add_lvalue_reference<value_type>::type;
 	using pointer = typename std::add_pointer<value_type>::type;
+	template<typename C, typename V>
+	using iterator_type = contiguous_iterator<C, V>;
 
 private:
 	pointer m_value;
@@ -88,6 +90,13 @@ public:
 	{
 		return other.m_value == m_value;
 	}
+
+	bool operator != (iterator &other)
+	{
+		return other.m_value != m_value;
+	}
 };
 
 }
+
+#endif
