@@ -2,13 +2,15 @@
 #define CORECPP_COMMAND_LINE_H_
 
 #include <algorithm>
+#include <codecvt>
 #include <functional>
-#include <sstream>
-#include <vector>
+#include <locale>
 #include <map>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <stdexcept>
+#include <vector>
 
 #include <corecpp/algorithm.h>
 #include <corecpp/diagnostic.h>
@@ -62,7 +64,8 @@ namespace corecpp
 		}
 		void read(const std::string& arg_value) const
 		{
-			if(arg_value.empty()) return;
+			if(arg_value.empty())
+				return;
 			std::istringstream iss(arg_value);
 			iss >> m_value;
 		}
@@ -92,6 +95,29 @@ namespace corecpp
 				std::istringstream iss(arg_value);
 				iss >> m_value;
 			}
+		};
+	};
+
+	/**
+	 * \brief specialization for wstring.
+	 */
+	template <>
+	class generic_option<std::wstring> : public option_reader
+	{
+		std::wstring& m_value;
+	public:
+		using value_type = std::wstring;
+		generic_option(std::wstring& value) : m_value(value)
+		{}
+		bool require_value() const
+		{
+			return true;
+		}
+		void read(const std::string& arg_value) const
+		{
+			if(arg_value.empty())
+				return;
+			m_value = std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(arg_value);
 		};
 	};
 
