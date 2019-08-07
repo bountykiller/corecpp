@@ -21,7 +21,11 @@ class uuid final
 		unsigned __int128 long_128;
 	} m_data;
 public:
-	uuid(const std::array<uint8_t, 16> data) noexcept : m_data { data }
+	static const uuid nil;
+
+	uuid(const std::array<uint8_t, 16>& data) noexcept : m_data { data }
+	{}
+	uuid(unsigned __int128 data) noexcept : m_data { .long_128 = data }
 	{}
 	uuid(const uuid& other) noexcept : m_data(other.m_data)
 	{}
@@ -35,6 +39,9 @@ public:
 		return m_data.long_128 == 0;
 	}
 };
+
+const uuid uuid::nil { 0 };
+
 
 }
 

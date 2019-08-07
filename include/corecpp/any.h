@@ -12,14 +12,13 @@ class any final
 	void* m_data;
 	std::function<void(void*)> m_deleter;
 	template<typename T>
-	std::function<void(void*)> make_deleter()
+	static std::function<void(void*)> make_deleter()
 	{
 		return [](void *ptr) { std::default_delete<T>()(static_cast<T*>(ptr)); };
 	}
 public:
 	any(std::nullptr_t = nullptr) : m_data(nullptr), m_deleter()
 	{}
-	any(const any&) = delete;
 	any(any&& other)
 	: m_data(other.m_data), m_deleter(std::move(other.m_deleter))
 	{

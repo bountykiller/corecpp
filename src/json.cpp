@@ -13,7 +13,7 @@ namespace json
 
 std::string to_string(const token& tk)
 {
-	switch(tk.which())
+	switch(tk.index())
 	{
 		case token::index_of<open_brace_token>::value:
 			return "{";
@@ -378,7 +378,7 @@ shift_result object_rule::shift(token&& tk)
 	{
 		case status::start:
 		{
-			switch (tk.which())
+			switch (tk.index())
 			{
 				case token::index_of<open_brace_token>::value:
 					m_status = status::members;
@@ -389,7 +389,7 @@ shift_result object_rule::shift(token&& tk)
 		}
 		case status::members:
 		{
-			switch (tk.which())
+			switch (tk.index())
 			{
 				case token::index_of<colon_token>::value:
 					return { true, rule { pair_rule {} } };
@@ -410,7 +410,7 @@ shift_result object_rule::shift(node&& n)
 {
 	if (m_status != status::members)
 		return { false, nullptr };
-	if(n.which() != node::index_of<pair_node>::value)
+	if(n.index() != node::index_of<pair_node>::value)
 		return { false, nullptr };
 	m_members.emplace_back(std::move(n.get<pair_node>()));
 	return { true, nullptr };
@@ -430,7 +430,7 @@ shift_result array_rule::shift(token&& tk)
 	{
 		case status::start:
 		{
-			switch (tk.which())
+			switch (tk.index())
 			{
 				case token::index_of<open_bracket_token>::value:
 					m_status = status::members;
@@ -441,7 +441,7 @@ shift_result array_rule::shift(token&& tk)
 		}
 		case status::members:
 		{
-			switch (tk.which())
+			switch (tk.index())
 			{
 				case token::index_of<colon_token>::value:
 					return { true, rule { value_rule {} } };
@@ -462,7 +462,7 @@ shift_result array_rule::shift(node&& n)
 {
 	if (m_status != status::members)
 		return { false, nullptr };
-	switch(n.which())
+	switch(n.index())
 	{
 		case node::index_of<object_node>::value:
 			m_values.emplace_back(std::move(n.get<object_node>()));
@@ -506,13 +506,13 @@ shift_result pair_rule::shift(token&& tk)
 	switch(m_status)
 	{
 		case status::start:
-			if(tk.which() != token::index_of<string_token>::value)
+			if(tk.index() != token::index_of<string_token>::value)
 				return { false, nullptr };
 			m_status = status::name;
 			m_name = tk.get<string_token>().value;
 			return { true, nullptr };
 		case status::name:
-			if(tk.which() != token::index_of<colon_token>::value)
+			if(tk.index() != token::index_of<colon_token>::value)
 				return { false, nullptr };
 			m_status = status::colon;
 			return { true, rule { value_rule {} } };
@@ -527,7 +527,7 @@ shift_result pair_rule::shift(node&& n)
 {
 	if (m_status != status::colon)
 		return { false, nullptr };
-	switch(n.which())
+	switch(n.index())
 	{
 		case node::index_of<object_node>::value:
 			m_value = value_node { std::move(n.get<object_node>()) };
@@ -583,7 +583,7 @@ node pair_rule::reduce()
 
 shift_result value_rule::shift(token&& tk)
 {
-	switch (tk.which())
+	switch (tk.index())
 	{
 		case token::index_of<open_brace_token>::value:
 			return { false, rule { object_rule {} } };
@@ -619,9 +619,9 @@ shift_result value_rule::shift(token&& tk)
 
 shift_result value_rule::shift(node&& n)
 {
-	if (m_value.which() != corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
+	if (m_value.index() != corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
  		return { false, nullptr };
-	switch(n.which())
+	switch(n.index())
 	{
 		case node::index_of<object_node>::value:
 			m_value = value_node { std::move(n.get<object_node>()) };
@@ -636,37 +636,37 @@ shift_result value_rule::shift(node&& n)
 
 node value_rule::reduce()
 {
-	if (m_value.which() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
+	if (m_value.index() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
 		throw corecpp::syntax_error(corecpp::concat<std::string>({ __func__," called when no value" }));
-	return m_value.get<value_node>().apply([](auto& value) -> node { return { std::move(value) }; });
+	return m_value.get<value_node>().visit([](auto& value) -> node { return { std::move(value) }; });
 }
 
 
 void parser::push(token&& tk)
 {
-	auto pushed = m_stack.back().apply([&tk](auto& r) -> shift_result { return r.shift(std::move(tk)); });
+	auto pushed = m_stack.back().visit([&tk](auto& r) -> shift_result { return r.shift(std::move(tk)); });
 	while (!pushed.eaten)
 	{
-		if (pushed.next_rule.which() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
+		if (pushed.next_rule.index() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
 		{
-			node n = m_stack.back().apply([](auto& r) -> node { return r.reduce(); });
+			node n = m_stack.back().visit([](auto& r) -> node { return r.reduce(); });
 			m_stack.pop_back();
 			if (m_stack.empty())
 				throw corecpp::syntax_error(corecpp::concat<std::string>({ __func__," unexpected token : ", to_string(tk)}));
-			pushed = m_stack.back().apply([&n](auto& r) -> shift_result { return r.shift(std::move(n)); });
+			pushed = m_stack.back().visit([&n](auto& r) -> shift_result { return r.shift(std::move(n)); });
 			if (!pushed.eaten)
 				throw corecpp::syntax_error(corecpp::concat<std::string>({ __func__," unexpected token : ", to_string(tk)}));
-			if (pushed.next_rule.which() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
+			if (pushed.next_rule.index() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
 				m_stack.emplace_back(std::move(pushed.next_rule.get<rule>()));
-			pushed = m_stack.back().apply([&tk](auto& r) -> shift_result { return r.shift(std::move(tk)); });
+			pushed = m_stack.back().visit([&tk](auto& r) -> shift_result { return r.shift(std::move(tk)); });
 		}
 		else
 		{
 			m_stack.emplace_back(std::move(pushed.next_rule.get<rule>()));
-			pushed = m_stack.back().apply([&tk](auto& r) -> shift_result { return r.shift(std::move(tk)); });
+			pushed = m_stack.back().visit([&tk](auto& r) -> shift_result { return r.shift(std::move(tk)); });
 		}
 	}
-	if (pushed.next_rule.which() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
+	if (pushed.next_rule.index() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
 		m_stack.emplace_back(std::move(pushed.next_rule.get<rule>()));
 }
 
@@ -674,14 +674,14 @@ node parser::end(void)
 {
 	for(;;)
 	{
-		node n = m_stack.back().apply([](auto& r) -> node { return r.reduce(); });
+		node n = m_stack.back().visit([](auto& r) -> node { return r.reduce(); });
 		m_stack.pop_back();
 		if (m_stack.empty())
 			return n;
-		auto pushed = m_stack.back().apply([&n](auto& r) -> shift_result { return r.shift(std::move(n)); });
+		auto pushed = m_stack.back().visit([&n](auto& r) -> shift_result { return r.shift(std::move(n)); });
 		if (!pushed.eaten)
 			throw corecpp::syntax_error(corecpp::concat<std::string>({ __func__," unable to reduce node"}));
-		if (pushed.next_rule.which() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
+		if (pushed.next_rule.index() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
 			m_stack.emplace_back(std::move(pushed.next_rule.get<rule>()));
 	}
 }
