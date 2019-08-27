@@ -13,8 +13,9 @@
 #include <stdexcept>
 #include <cwchar>
 
-#include <corecpp/variant.h>
 #include <corecpp/algorithm.h>
+#include <corecpp/diagnostic.h>
+#include <corecpp/variant.h>
 #include <corecpp/serialization/common.h>
 
 namespace corecpp
@@ -393,6 +394,16 @@ namespace corecpp
 				convert_and_escape(value);
 				m_stream << '"';
 			}
+			/* This overload is necessary in order to be able to serialize std::map
+			 */
+			template <typename FirstT, typename SecondT>
+			void serialize(const std::pair<FirstT, SecondT>& value)
+			{
+				begin_object<std::pair<FirstT, SecondT>>();
+				write_element<FirstT>(value.first);
+				write_element<SecondT>(value.second);
+				end_object();
+			}
 			template <typename ValueT, typename Enable = void>
 			void serialize(ValueT&& value)
 			{
@@ -428,9 +439,18 @@ namespace corecpp
 			{
 				if (!m_first)
 					m_stream << ',';
+				serialize(std::forward<ValueT>(value));
+				m_first = false;
+			}
+			template <typename ValueT>
+			void write_element(const ValueT& value)
+			{
+				if (!m_first)
+					m_stream << ',';
 				serialize(value);
 				m_first = false;
 			}
+
 			template <typename StringT, typename ValueT>
 			void write_property(const StringT& name, ValueT&& value)
 			{
@@ -454,8 +474,10 @@ namespace corecpp
 			void write_array(ValueT&& value)
 			{
 				begin_array<ValueT>();
-				for (auto&& item : value)
-					write_element(item);
+				for (typename std::decay_t<ValueT>::const_iterator iter = std::begin(value);
+					iter != std::end(value);
+					++iter)
+					write_element(*iter);
 				end_array();
 			}
 		};
@@ -568,6 +590,16 @@ namespace corecpp
 				if (tk.index() != token::index_of<string_token>::value)
 					throw std::runtime_error(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
 				value = std::move(tk.get<string_token>().value);
+			}
+			/* This overload is necessary in order to be able to deserialize std::map
+			 */
+			template <typename FirstT, typename SecondT>
+			void deserialize(const std::pair<FirstT,SecondT>& value)
+			{
+				begin_object<std::pair<FirstT,SecondT>>();
+				read_element<FirstT>(value.first);
+				read_element<SecondT>(value.second);
+				end_object();
 			}
 			template <typename ValueT, typename Enable = void>
 			void deserialize(ValueT& value)

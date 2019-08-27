@@ -48,7 +48,7 @@ class variant
 	template<typename T>
 	static deleter_type make_deleter()
 	{
-		return [](void *ptr) { std::default_delete<T>()(static_cast<T*>(ptr)); };
+		return [](unsigned char *ptr) { std::default_delete<T>()(reinterpret_cast<T*>(ptr)); };
 	}
 public:
 	template<typename T>
@@ -123,14 +123,14 @@ public:
 	T& get()
 	{
 		assert(m_type_index == index_of<T>::value);
-		return reinterpret_cast<T&>(m_data);
+		return reinterpret_cast<T&>(*m_data);
 	}
 
 	template<typename T>
 	const T& get() const
 	{
 		assert(m_type_index == index_of<T>::value);
-		return reinterpret_cast<const T&>(m_data);
+		return reinterpret_cast<const T&>(*m_data);
 	}
 
 	template<uint pos>

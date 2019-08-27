@@ -1,15 +1,16 @@
-#include <list>
-#include <type_traits>
-#include <iostream>
-#include <functional>
-#include <utility>
-#include <tuple>
-#include <set>
-#include <vector>
-#include <memory>
-#include <iterator>
-#include <typeinfo>
 #include <fstream>
+#include <functional>
+#include <iterator>
+#include <iostream>
+#include <list>
+#include <map>
+#include <memory>
+#include <set>
+#include <tuple>
+#include <type_traits>
+#include <typeinfo>
+#include <utility>
+#include <vector>
 
 #include <corecpp/algorithm.h>
 #include <corecpp/serialization/json.h>
@@ -67,9 +68,23 @@ struct complex_type
 	}
 };
 
+void map_example(void)
+{
+	static const std::map<int, std::vector<int>> usergroups {
+		{ 1, { 1, 2, 3 } },
+		{ 2, { 2, 3 } },
+		{ 3, { 3 } }
+	};
+	std::ostringstream json;
+	corecpp::json::serializer s(json);
+	s.serialize(usergroups);
+	std::cout << json.str() << std::endl;
+}
+
 int main(int argc, char** argv)
 {
-	const std::string json_simple = "{\"uid\":1,\"lastname\":\"masse\",\"firstname\":\"jeronimo\",\"groups\":[{\"name\":\"users\",\"id\":1},{\"name\":\"mygroup\",\"id\":2}]}";
+	corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::info);
+	static const std::string json_simple = "{\"uid\":1,\"lastname\":\"masse\",\"firstname\":\"jeronimo\",\"groups\":[{\"name\":\"users\",\"id\":1},{\"name\":\"mygroup\",\"id\":2}]}";
 	std::istringstream iss;
 
 	std::cout << "\nSIMPLE Type:" << std::endl;
@@ -96,6 +111,9 @@ int main(int argc, char** argv)
 	std::cout << "c symbol =>" << c.symbol << " value => " << c.value << std::endl;
 	std::cout << "Now serialize it!" << std::endl;
 	s.serialize(c);
+
+	std::cout << std::endl << std::endl << "STD::MAP example:" << std::endl;
+	map_example();
 
 	return 0;
 };

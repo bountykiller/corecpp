@@ -2,14 +2,27 @@
 #include <locale>
 #include <memory>
 #include <cmath>
+
+#include <corecpp/algorithm.h>
 #include <corecpp/serialization/common.h>
 #include <corecpp/serialization/json.h>
-#include <corecpp/algorithm.h>
 
 namespace corecpp
 {
 namespace json
 {
+
+corecpp::diagnostic::channel& json_channel()
+{
+	static auto& channel = corecpp::diagnostic::manager::get_channel("corecpp::json");
+	return channel;
+}
+
+corecpp::diagnostic::event_producer& json_logger()
+{
+	static auto logger = corecpp::diagnostic::event_producer(json_channel());
+	return logger;
+}
 
 std::string to_string(const token& tk)
 {
@@ -90,6 +103,8 @@ std::unique_ptr<token> tokenizer::read_string_literal()
 	bool good = false;
 	do
 	{
+		json_logger().debug("string_literal : read char",
+			corecpp::concat<std::string>({ std::string(1, m_buffer[m_position]), " at pos ", std::to_string(m_position) }), __FILE__, __LINE__);
 		switch(m_buffer[m_position])
 		{
 			case '\"':
@@ -132,6 +147,7 @@ std::unique_ptr<token> tokenizer::read_string_literal()
 	if(!good)
 		return nullptr;
 
+	json_logger().trace("string_literal read", std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(literal), __FILE__, __LINE__);
 	return std::make_unique<token>(string_token { literal });
 }
 
@@ -243,6 +259,8 @@ std::unique_ptr<token> tokenizer::next()
 {
 	if(m_position == m_buffer.size())
 	{
+		json_logger().trace("No more token to parse",
+						   corecpp::concat<std::string>({ "at pos ", std::to_string(m_position) }), __FILE__, __LINE__);
 		shrink();
 		return nullptr;
 	}
@@ -250,6 +268,8 @@ std::unique_ptr<token> tokenizer::next()
 	{
 		if(++m_position == m_buffer.size())
 		{
+			json_logger().trace("Skipped blank caracters, no more token to parse",
+						   corecpp::concat<std::string>({ "at pos ", std::to_string(m_position) }), __FILE__, __LINE__);
 			shrink();
 			return nullptr;
 		}
@@ -742,7 +762,10 @@ token deserializer::read()
 	// 1st try, no read
 	auto token = m_tokenizer.next();
 	if (token)
+	{
+		json_logger().trace("read token", to_string(*token), __FILE__, __LINE__);
 		return std::move(*token);
+	}
 	// 2nd try, read available data
 	auto available = m_stream.rdbuf()->in_avail();
 	std::string buffer;
@@ -751,7 +774,10 @@ token deserializer::read()
 	m_tokenizer.eat(buffer);
 	token = m_tokenizer.next();
 	if (token)
+	{
+		json_logger().trace("read token", to_string(*token), __FILE__, __LINE__);
 		return std::move(*token);
+	}
 	// 3rd try, read by block
 	do
 	{
@@ -763,6 +789,7 @@ token deserializer::read()
 		token = m_tokenizer.next();
 	}
 	while (!token);
+	json_logger().trace("read token", to_string(*token), __FILE__, __LINE__);
 	return std::move(*token);
 }
 
