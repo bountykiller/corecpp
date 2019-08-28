@@ -316,6 +316,7 @@ namespace corecpp
 
 		/* TODO:
 		 * Add serialization/deserialization of char
+		 * Add serialization/deserialization of strong enums
 		 */
 		class serializer
 		{
@@ -394,16 +395,6 @@ namespace corecpp
 				convert_and_escape(value);
 				m_stream << '"';
 			}
-			/* This overload is necessary in order to be able to serialize std::map
-			 */
-			template <typename FirstT, typename SecondT>
-			void serialize(const std::pair<FirstT, SecondT>& value)
-			{
-				begin_object<std::pair<FirstT, SecondT>>();
-				write_element<FirstT>(value.first);
-				write_element<SecondT>(value.second);
-				end_object();
-			}
 			template <typename ValueT, typename Enable = void>
 			void serialize(ValueT&& value)
 			{
@@ -478,6 +469,23 @@ namespace corecpp
 					iter != std::end(value);
 					++iter)
 					write_element(*iter);
+				end_array();
+			}
+			template <typename ValueT>
+			void write_associative_array(ValueT&& value)
+			{
+				begin_array<ValueT>();
+				for (typename std::decay_t<ValueT>::const_iterator iter = std::begin(value);
+					iter != std::end(value);
+					++iter)
+				{
+					if (!m_first)
+						m_stream << ',';
+					begin_object<typename std::decay_t<ValueT>::value_type>();
+					write_element<typename std::decay_t<ValueT>::key_type>(iter->first);
+					write_element<typename std::decay_t<ValueT>::mapped_type>(iter->second);
+					end_object();
+				}
 				end_array();
 			}
 		};
@@ -591,16 +599,6 @@ namespace corecpp
 					throw std::runtime_error(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
 				value = std::move(tk.get<string_token>().value);
 			}
-			/* This overload is necessary in order to be able to deserialize std::map
-			 */
-			template <typename FirstT, typename SecondT>
-			void deserialize(const std::pair<FirstT,SecondT>& value)
-			{
-				begin_object<std::pair<FirstT,SecondT>>();
-				read_element<FirstT>(value.first);
-				read_element<SecondT>(value.second);
-				end_object();
-			}
 			template <typename ValueT, typename Enable = void>
 			void deserialize(ValueT& value)
 			{
@@ -612,6 +610,7 @@ namespace corecpp
 			template <typename ValueT>
 			void begin_object()
 			{
+				m_first = true;
 				token tk = read();
 				if (tk.index() != token::index_of<open_brace_token>::value)
 					throw std::runtime_error(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(tk) }));
@@ -667,7 +666,7 @@ namespace corecpp
 					tk = read();
 				} while (tk.index() == token::index_of<comma_token>::value);
 				if (tk.index() != token::index_of<close_brace_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "close brace expected, got ", to_string(tk) }));
+					throw std::runtime_error(corecpp::concat<std::string>({ "close brace token expected, got ", to_string(tk) }));
 			}
 			template <typename ValueT, typename PropertiesT>
 			void read_object(ValueT& value, const PropertiesT& properties)
@@ -702,13 +701,32 @@ namespace corecpp
 				{
 					using ElemT = typename ValueT::value_type;
 					ElemT elem;
-					/* NOTE:
-					 * This should work with most of the containers.
-					 * Anyway, the container concept doesn't include an emplace, nor does any algorithm.
-					 * In consequence, this could fail if the container doesn't have an emplace_back method :(
-					 */
+
 					deserialize(elem);
 					value.emplace_back(std::move(elem));
+					tk = read();
+				} while (tk.index() == token::index_of<comma_token>::value);
+				if (tk.index() != token::index_of<close_bracket_token>::value)
+					throw std::runtime_error(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(tk) }));
+			}
+			template <typename ValueT>
+			void read_associative_array(ValueT& value)
+			{
+				token tk = read();
+				if (tk.index() != token::index_of<open_bracket_token>::value)
+					throw std::runtime_error(corecpp::concat<std::string>({ "open bracket token expected, got ", to_string(tk) }));
+				do
+				{
+					using KeyT = typename ValueT::key_type;
+					using MappedT = typename ValueT::mapped_type;
+					KeyT key;
+					MappedT mapped;
+
+					begin_object<typename ValueT::value_type>();
+					read_element<KeyT>(key);
+					read_element<MappedT>(mapped);
+					end_object();
+					value.emplace(std::move(key), std::move(mapped));
 					tk = read();
 				} while (tk.index() == token::index_of<comma_token>::value);
 				if (tk.index() != token::index_of<close_bracket_token>::value)

@@ -52,7 +52,7 @@ namespace corecpp
 	};
 	template <typename SerializerT, typename ValueT>
 	struct serialize_impl<SerializerT, ValueT,
-						typename std::enable_if<corecpp::is_dereferencable<typename std::decay<ValueT>::type>::value>::type>
+						typename std::enable_if<corecpp::is_dereferencable<std::decay_t<ValueT>>::value>::type>
 	{
 		void operator () (SerializerT& s, ValueT&& value)
 		{
@@ -64,8 +64,17 @@ namespace corecpp
 	};
 	template <typename SerializerT, typename ValueT>
 	struct serialize_impl<SerializerT, ValueT,
+						typename std::enable_if<std::is_enum<std::decay_t<ValueT>>::value>::type>
+	{
+		void operator () (SerializerT& s, ValueT&& value)
+		{
+			s.serialize(std::underlying_type_t<std::decay_t<ValueT>>(value));
+		}
+	};
+	template <typename SerializerT, typename ValueT>
+	struct serialize_impl<SerializerT, ValueT,
 						typename std::enable_if<
-							is_serializable<typename std::decay<ValueT>::type, typename std::decay<SerializerT>::type>::value>
+							is_serializable<std::decay_t<ValueT>, std::decay_t<SerializerT>>::value>
 						::type>
 	{
 		void operator () (SerializerT& s, ValueT&& value)
@@ -77,7 +86,17 @@ namespace corecpp
 	};
 	template <typename SerializerT, typename ValueT>
 	struct serialize_impl<SerializerT, ValueT,
-						typename std::enable_if<is_iterable<typename std::decay<ValueT>::type>::value>::type>
+						typename std::enable_if<is_associative<std::decay_t<ValueT>>::value>::type>
+	{
+		void operator () (SerializerT& s, ValueT&& value)
+		{
+			s.write_associative_array(std::forward<ValueT>(value));
+		}
+	};
+	template <typename SerializerT, typename ValueT>
+	struct serialize_impl<SerializerT, ValueT,
+						typename std::enable_if<!is_associative<std::decay_t<ValueT>>::value
+							&& is_iterable<std::decay_t<ValueT>>::value>::type>
 	{
 		void operator () (SerializerT& s, ValueT&& value)
 		{
@@ -97,7 +116,7 @@ namespace corecpp
 	};
 	template <typename DeserializerT, typename ValueT>
 	struct deserialize_impl<DeserializerT, ValueT,
-	typename std::enable_if<corecpp::is_dereferencable<typename std::decay<ValueT>::type>::value>::type>
+	typename std::enable_if<corecpp::is_dereferencable<std::decay_t<ValueT>>::value>::type>
 	{
 		void operator () (DeserializerT& d, ValueT& value)
 		{
@@ -107,8 +126,18 @@ namespace corecpp
 	};
 	template <typename DeserializerT, typename ValueT>
 	struct deserialize_impl<DeserializerT, ValueT,
+						typename std::enable_if<std::is_enum<std::decay_t<ValueT>>::value>::type>
+	{
+		void operator () (DeserializerT& d, ValueT& value)
+		{
+			using underlying_t = std::underlying_type_t<std::decay_t<ValueT>>;
+			d.deserialize(reinterpret_cast<std::add_lvalue_reference_t<underlying_t>>(value));
+		}
+	};
+	template <typename DeserializerT, typename ValueT>
+	struct deserialize_impl<DeserializerT, ValueT,
 							typename std::enable_if<
-								is_deserializable<typename std::decay<ValueT>::type, typename std::decay<DeserializerT>::type>::value>
+								is_deserializable<std::decay_t<ValueT>, typename std::decay<DeserializerT>::type>::value>
 							::type>
 	{
 	public:
@@ -119,7 +148,20 @@ namespace corecpp
 	};
 	template <typename DeserializerT, typename ValueT>
 	struct deserialize_impl<DeserializerT, ValueT,
-							typename std::enable_if<is_iterable<typename std::decay<ValueT>::type>::value>::type>
+						typename std::enable_if<is_associative<std::decay_t<ValueT>>::value>::type>
+	{
+		void operator () (DeserializerT& d, ValueT& value)
+		{
+			/* When inserting elements, associative_array differs semantically from array.
+			 * As a consequence, another method is necessary
+			 */
+			d.read_associative_array(value);
+		}
+	};
+	template <typename DeserializerT, typename ValueT>
+	struct deserialize_impl<DeserializerT, ValueT,
+							typename std::enable_if<!is_associative<std::decay_t<ValueT>>::value
+								&& is_iterable<std::decay_t<ValueT>>::value>::type>
 	{
 		void operator () (DeserializerT& d, ValueT& value)
 		{

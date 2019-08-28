@@ -14,16 +14,32 @@
 
 #include <corecpp/algorithm.h>
 #include <corecpp/serialization/json.h>
+#include <corecpp/flags.h>
+
+enum struct rights {
+	read = 1 << 0,
+	write = 1 << 1,
+	execute = 1 << 2
+};
+
+corecpp::enum_map<rights> rights_strings = {
+	{ rights::read, "Read" },
+	{ rights::write, "Write" },
+	{ rights::execute, "Execute" }
+};
 
 struct group
 {
 	int gid;
 	std::string name;
+	corecpp::flags<rights> permissions;
+
 	static const auto& properties()
 	{
 		static auto result = std::make_tuple(
 			corecpp::make_property("id", &group::gid),
-			corecpp::make_property("name", &group::name)
+			corecpp::make_property("name", &group::name),
+			corecpp::make_property("permissions", &group::permissions)
 		);
 		return result;
 	}
@@ -70,21 +86,35 @@ struct complex_type
 
 void map_example(void)
 {
-	static const std::map<int, std::vector<int>> usergroups {
-		{ 1, { 1, 2, 3 } },
-		{ 2, { 2, 3 } },
-		{ 3, { 3 } }
+	static const std::map<int, std::vector<rights>> groups_rights {
+		{ 1, { rights::read, rights::write, rights::execute } },
+		{ 2, { rights::read, rights::write } },
+		{ 3, { rights::read } }
 	};
 	std::ostringstream json;
 	corecpp::json::serializer s(json);
-	s.serialize(usergroups);
+	s.serialize(groups_rights);
 	std::cout << json.str() << std::endl;
+
+	std::remove_const_t<decltype(groups_rights)> groups_rights_copy;
+	std::istringstream iss;
+	corecpp::json::deserializer d(iss);
+
+	iss.str(json.str());
+	d.deserialize(groups_rights_copy);
+	for (const auto& group_rights : groups_rights_copy)
+	{
+		std::cout << group_rights.first << " : ";
+		for (const auto& right : group_rights.second)
+			std::cout << corecpp::etos(right, rights_strings) << " ";
+		std::cout << std::endl;
+	}
 }
 
 int main(int argc, char** argv)
 {
 	corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::info);
-	static const std::string json_simple = "{\"uid\":1,\"lastname\":\"masse\",\"firstname\":\"jeronimo\",\"groups\":[{\"name\":\"users\",\"id\":1},{\"name\":\"mygroup\",\"id\":2}]}";
+	static const std::string json_simple = "{\"uid\":1,\"lastname\":\"masse\",\"firstname\":\"jeronimo\",\"groups\":[{\"name\":\"users\",\"id\":1, \"permissions\": { \"value\": 2 }},{\"name\":\"mygroup\",\"id\":2}]}";
 	std::istringstream iss;
 
 	std::cout << "\nSIMPLE Type:" << std::endl;

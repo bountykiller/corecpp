@@ -52,15 +52,16 @@ using concrete = typename type_resolver<T>::type;
 
 /**
  * @class is_iterable
- * @brief allows to know of a class can be browsed through an iterator
+ * @brief allows to know if a class can be browsed through an iterator
  */
 template<typename T, typename Enable = void>
 struct is_iterable
 {
 	static constexpr bool value = false;
 };
+
 template<typename T>
-struct is_iterable<T, typename std::enable_if<!std::is_void<typename T::iterator>::value>::type>
+struct is_iterable<T, std::enable_if_t<!std::is_void<typename T::iterator>::value>>
 {
 	/* NOTE:
 	 * the real thing to do here would be to tests if a given type is a Container (using the Container concept)
@@ -68,6 +69,25 @@ struct is_iterable<T, typename std::enable_if<!std::is_void<typename T::iterator
 	 */
 	static constexpr bool value = true;
 };
+
+
+/**
+ * @class is_associative
+ * @brief allows to know if a class is an associative container
+ */
+template<typename T, typename Enable = void>
+struct is_associative
+{
+	static constexpr bool value = false;
+};
+
+template<typename T>
+struct is_associative<T, std::enable_if_t<!std::is_void<typename T::key_type>::value
+	&& !std::is_void<typename T::mapped_type>::value>>
+{
+	static constexpr bool value = true;
+};
+
 
 /**
  * @class is_dereferencable
@@ -79,14 +99,13 @@ struct is_dereferencable
 	static constexpr bool value = false;
 };
 template<typename T>
-struct is_dereferencable<T, typename std::enable_if<std::is_pointer<T>::value>::type>
+struct is_dereferencable<T, std::enable_if_t<std::is_pointer<T>::value>>
 {
 	static constexpr bool value = true;
 };
 template<typename T>
-struct is_dereferencable<T,
-					typename std::enable_if<std::is_member_function_pointer<decltype(&T::operator*)>::value
-										&& std::is_member_function_pointer<decltype(&T::operator->)>::value>::type>
+struct is_dereferencable<T, std::enable_if_t<std::is_member_function_pointer<decltype(&T::operator*)>::value
+	&& std::is_member_function_pointer<decltype(&T::operator->)>::value>>
 {
 	static constexpr bool value = true;
 };

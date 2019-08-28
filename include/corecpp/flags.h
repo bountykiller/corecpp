@@ -15,6 +15,11 @@ public:
 private:
 	underlying_type m_value;
 public:
+	static const auto& properties()
+	{
+		static auto result = std::make_tuple(corecpp::make_property("value", &flags::m_value));
+		return result;
+	}
 	flags(const flags& value) = default;
 	constexpr flags(EnumT e) : m_value (static_cast<underlying_type>(e))
 	{}
