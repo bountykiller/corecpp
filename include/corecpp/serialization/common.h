@@ -104,6 +104,27 @@ namespace corecpp
 		}
 	};
 
+	/*
+	template <typename SerializerT>
+	struct serialize_visitor
+	{
+		SerializerT& s;
+		template <typename ValueT>
+		void operator () (ValueT&& value)
+		{
+			s.serialize(std::forward<ValueT>(value));
+		}
+	};
+	template <typename SerializerT, typename ValueT>
+	struct serialize_impl<SerializerT, ValueT,
+		typename std::enable_if<is_visitable<std::decay_t<ValueT>, serialize_visitor<SerializerT>>::value >::type>
+	{
+		void operator () (SerializerT& s, ValueT&& value)
+		{
+			visit(serialize_visitor<SerializerT>(s), std::forward<ValueT>(value));
+		}
+	};
+	*/
 
 	template <typename DeserializerT, typename ValueT, typename Enable = void>
 	struct deserialize_impl
@@ -169,6 +190,27 @@ namespace corecpp
 		}
 	};
 
+	/*
+	template <typename DeserializerT>
+	struct deserialize_visitor
+	{
+		DeserializerT& s;
+		template <typename ValueT>
+		void operator () (ValueT& value)
+		{
+			s.deserialize(value);
+		}
+	};
+	template <typename DeserializerT, typename ValueT>
+	struct deserialize_impl<DeserializerT, ValueT,
+		typename std::enable_if<is_visitable<std::decay_t<ValueT>, deserialize_visitor<DeserializerT>>::value >::type>
+	{
+		void operator () (DeserializerT& d, ValueT& value)
+		{
+			visit(serialize_visitor<DeserializerT>(d), value);
+		}
+	};
+	*/
 
 	struct lexical_error : std::invalid_argument
 	{

@@ -2,6 +2,7 @@
 #define CORECPP_EXTENSIONS_H
 
 #include <tuple>
+#include <type_traits>
 #include <corecpp/meta/reflection.h>
 
 namespace corecpp
@@ -106,6 +107,24 @@ struct is_dereferencable<T, std::enable_if_t<std::is_pointer<T>::value>>
 template<typename T>
 struct is_dereferencable<T, std::enable_if_t<std::is_member_function_pointer<decltype(&T::operator*)>::value
 	&& std::is_member_function_pointer<decltype(&T::operator->)>::value>>
+{
+	static constexpr bool value = true;
+};
+
+
+/**
+ * @class is_visitable
+ * @brief allows to know if a class is an associative container
+ */
+template<typename T, typename VisitorT, typename Enable = void>
+struct is_visitable
+{
+	static constexpr bool value = false;
+};
+
+template<typename T, typename VisitorT>
+struct is_visitable<T, VisitorT,
+	std::enable_if_t<std::is_member_function_pointer<decltype(&T::valueless_by_exception)>::value>>
 {
 	static constexpr bool value = true;
 };

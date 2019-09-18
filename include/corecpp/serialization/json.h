@@ -154,10 +154,9 @@ namespace corecpp
 		struct null_node
 		{
 		};
-		struct array_node;
-		struct object_node;
 
-		using value_node = corecpp::variant<object_node, array_node, string_node, integral_node, numeric_node, char_node, boolean_node, null_node>;
+		struct pair_node;
+		struct value_node;
 
 		struct array_node
 		{
@@ -168,44 +167,50 @@ namespace corecpp
 		static inline auto end(array_node& a) { return std::end(a.values); }
 		static inline auto end(const array_node& a) { return std::end(a.values); }
 
+		struct object_node
+		{
+			std::vector<pair_node> members;
+
+			template <typename StringT, typename ValueT>
+			value_node& emplace(StringT&& key, ValueT&& value);
+			value_node& at (const std::wstring& key);
+			const value_node& at (const std::wstring& key) const;
+		};
+		static inline auto begin(object_node& o) { return std::begin(o.members); }
+		static inline auto begin(const object_node& o) { return std::begin(o.members); }
+		static inline auto end(object_node& o) { return std::end(o.members); }
+		static inline auto end(const object_node& o) { return std::end(o.members); }
+
+		struct value_node
+		: public corecpp::variant<object_node, array_node, string_node,
+			integral_node, numeric_node, char_node, boolean_node, null_node>
+		{
+			template <typename T>
+			value_node(T&& value)
+			: corecpp::variant<object_node, array_node, string_node,
+				integral_node, numeric_node, char_node, boolean_node, null_node>(std::forward<T>(value))
+			{
+			}
+		};
+
 		struct pair_node
 		{
 			string_node name;
 			value_node value;
 		};
 
-		struct object_node
-		{
-			std::vector<pair_node> members;
 
-			template <typename StringT, typename ValueT>
-			value_node& emplace(StringT&& key, ValueT&& value)
-			{
-				for (auto& member : members)
-					if (member.name.value == key)
-						return (member.value = std::forward<ValueT>(value));
-					members.emplace_back(key, std::forward<ValueT>(value));
-				return members.back().value;
-			}
-			value_node& at (const std::wstring& key)
-			{
-				for (auto& value : members)
-					if (value.name.value == key)
-						return value.value;
-					throw std::overflow_error(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
-			}
-			const value_node& at (const std::wstring& key) const
-			{
-				for (const auto& value : members)
-					if (value.name.value == key)
-						return value.value;
-					throw std::overflow_error(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
-			}
-		};
-		static inline auto begin(object_node& o) { return std::begin(o.members); }
-		static inline auto begin(const object_node& o) { return std::begin(o.members); }
-		static inline auto end(object_node& o) { return std::end(o.members); }
-		static inline auto end(const object_node& o) { return std::end(o.members); }
+		/* Should be declared here because it needs pair_node to be fully declared
+		 */
+		template <typename StringT, typename ValueT>
+		value_node& object_node::emplace(StringT&& key, ValueT&& value)
+		{
+			for (auto& member : members)
+				if (member.name.value == key)
+					return (member.value = std::forward<ValueT>(value));
+				members.emplace_back(key, std::forward<ValueT>(value));
+			return members.back().value;
+		}
 
 		using node = corecpp::variant<object_node, pair_node, array_node, string_node, integral_node, numeric_node, char_node, boolean_node, null_node>;
 
@@ -216,13 +221,8 @@ namespace corecpp
 		class pair_rule;
 		class array_rule;
 		class value_rule;
+		struct shift_result;
 		using rule = corecpp::variant<object_rule, pair_rule, array_rule, value_rule>;
-
-		struct shift_result
-		{
-			bool eaten;
-			corecpp::variant<std::nullptr_t, rule> next_rule = nullptr;
-		};
 
 		class object_rule
 		{
@@ -296,6 +296,13 @@ namespace corecpp
 			shift_result shift(token&& n);
 			shift_result shift(node&& n);
 			node reduce();
+		};
+
+
+		struct shift_result
+		{
+			bool eaten;
+			corecpp::variant<std::nullptr_t, rule> next_rule = nullptr;
 		};
 
 

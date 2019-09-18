@@ -388,6 +388,27 @@ std::unique_ptr<token> tokenizer::next()
 			return nullptr;
 	}
 }
+/*
+ * NODES
+ */
+value_node& object_node::at (const std::wstring& key)
+{
+	for (auto& value : members)
+	{
+		if (value.name.value == key)
+			return value.value;
+	}
+	throw std::overflow_error(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
+}
+const value_node& object_node::at (const std::wstring& key) const
+{
+	for (const auto& value : members)
+	{
+		if (value.name.value == key)
+			return value.value;
+	}
+	throw std::overflow_error(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
+}
 
 /*
  * PARSING RULES
