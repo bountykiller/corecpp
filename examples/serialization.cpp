@@ -5,6 +5,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <tuple>
 #include <type_traits>
@@ -33,13 +34,15 @@ struct group
 	int gid;
 	std::string name;
 	corecpp::flags<rights> permissions;
+	std::optional<std::string> comment;
 
 	static const auto& properties()
 	{
 		static auto result = std::make_tuple(
 			corecpp::make_property("id", &group::gid),
 			corecpp::make_property("name", &group::name),
-			corecpp::make_property("permissions", &group::permissions)
+			corecpp::make_property("permissions", &group::permissions),
+			corecpp::make_property("comment", &group::comment)
 		);
 		return result;
 	}
@@ -113,8 +116,8 @@ void map_example(void)
 
 int main(int argc, char** argv)
 {
-	corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::info);
-	static const std::string json_simple = "{\"uid\":1,\"lastname\":\"masse\",\"firstname\":\"jeronimo\",\"groups\":[{\"name\":\"users\",\"id\":1, \"permissions\": { \"value\": 2 }},{\"name\":\"mygroup\",\"id\":2}]}";
+	corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::trace);
+	static const std::string json_simple = "{\"uid\":1,\"lastname\":\"masse\",\"firstname\":\"jeronimo\",\"groups\":[{\"name\":\"users\",\"id\":1, \"comment\":{}, \"permissions\": { \"value\": 2 }},{\"name\":\"mygroup\",\"id\":2, \"comment\":{ \"value\":\"This is my group\"} }]}";
 	std::istringstream iss;
 
 	std::cout << "\nSIMPLE Type:" << std::endl;

@@ -65,20 +65,20 @@ public:
 	{
 		new(&m_data) typename type_at<0>::type;
 	}
-	variant(const variant& other) noexcept(std::is_nothrow_copy_constructible<typename type_at<0>::type>::value)
-	: m_type_index(other.m_type_index)
-	{
-		visit([&other](auto& value) {
-			using ValueT = std::remove_reference_t<decltype(value)>;
-			new (&value) ValueT(other.template get<ValueT>());
-		});
-	}
 	variant(variant&& other) noexcept
 	: m_type_index(other.m_type_index)
 	{
 		visit([&other](auto& value) {
 			using ValueT = std::remove_reference_t<decltype(value)>;
 			new (&value) ValueT(std::move(other.template get<ValueT>()));
+		});
+	}
+	variant(const variant& other) noexcept(std::is_nothrow_copy_constructible<typename type_at<0>::type>::value)
+	: m_type_index(other.m_type_index)
+	{
+		visit([&other](auto& value) {
+			using ValueT = std::remove_reference_t<decltype(value)>;
+			new (&value) ValueT(other.template get<ValueT>());
 		});
 	}
 

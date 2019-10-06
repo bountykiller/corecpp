@@ -89,10 +89,14 @@ struct is_associative<T, std::enable_if_t<!std::is_void<typename T::key_type>::v
 	static constexpr bool value = true;
 };
 
+template<typename T>
+inline constexpr bool is_associative_v = is_associative<T>::value;
+
 
 /**
  * @class is_dereferencable
  * @brief allows to know of a class can be derefenced through the * or the -> operators
+ * TODO: is_dereferencable should also be convertible to bool
  */
 template<typename T, typename Enable = void>
 struct is_dereferencable
@@ -105,16 +109,21 @@ struct is_dereferencable<T, std::enable_if_t<std::is_pointer<T>::value>>
 	static constexpr bool value = true;
 };
 template<typename T>
-struct is_dereferencable<T, std::enable_if_t<std::is_member_function_pointer<decltype(&T::operator*)>::value
-	&& std::is_member_function_pointer<decltype(&T::operator->)>::value>>
+struct is_dereferencable<T, std::enable_if_t<
+	std::is_reference_v<decltype(static_cast<T*>(nullptr)->operator*())>
+	&& std::is_pointer_v<decltype(static_cast<T*>(nullptr)->operator->())>
+	>>
 {
 	static constexpr bool value = true;
 };
 
+template<typename T>
+inline constexpr bool is_dereferencable_v = is_dereferencable<T>::value;
+
 
 /**
  * @class is_visitable
- * @brief allows to know if a class is an associative container
+ * @brief allows to know if a class is a visitable (typically variant)
  */
 template<typename T, typename VisitorT, typename Enable = void>
 struct is_visitable
@@ -128,6 +137,9 @@ struct is_visitable<T, VisitorT,
 {
 	static constexpr bool value = true;
 };
+
+template<typename T, typename V>
+inline constexpr bool is_visitable_v = is_visitable<T,V>::value;
 
 }
 

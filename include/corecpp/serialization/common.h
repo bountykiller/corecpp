@@ -56,10 +56,11 @@ namespace corecpp
 	{
 		void operator () (SerializerT& s, ValueT&& value)
 		{
-			if (value)
-				s.serialize(*value);
-			else
-				s.serialize(nullptr);
+			s.write_object_cb(std::forward<ValueT>(value),
+				[&](ValueT&& v){
+					if (value)
+						s.write_property("value", *v);
+				});
 		}
 	};
 	template <typename SerializerT, typename ValueT>
@@ -137,12 +138,36 @@ namespace corecpp
 	};
 	template <typename DeserializerT, typename ValueT>
 	struct deserialize_impl<DeserializerT, ValueT,
-	typename std::enable_if<corecpp::is_dereferencable<std::decay_t<ValueT>>::value>::type>
+	typename std::enable_if_t<corecpp::is_dereferencable_v<std::decay_t<ValueT>>
+		&& std::is_constructible_v<std::decay_t<ValueT>, std::add_pointer_t<std::decay_t<ValueT>>>> >
 	{
 		void operator () (DeserializerT& d, ValueT& value)
 		{
-			value = ValueT(new typename std::remove_reference<decltype(*value)>::type());
-			d.deserialize(*value);
+			value = ValueT {};
+			d.read_object([&](const std::wstring& property){
+				using value_type = typename std::remove_reference<decltype(*value)>::type;
+				if (property != L"value")
+					throw std::runtime_error("invalid property");
+				value = ValueT(new value_type());
+				d.deserialize(*value);
+			});
+		}
+	};
+	template <typename DeserializerT, typename ValueT>
+	struct deserialize_impl<DeserializerT, ValueT,
+	typename std::enable_if_t<corecpp::is_dereferencable_v<std::decay_t<ValueT>>
+		&& std::is_default_constructible_v<typename std::decay_t<ValueT>::value_type>> >
+	{
+		void operator () (DeserializerT& d, ValueT& value)
+		{
+			value = ValueT {};
+			d.read_object_cb([&](const std::wstring& property){
+				using value_type = typename std::remove_reference<decltype(*value)>::type;
+				if (property != L"value")
+					throw std::runtime_error("invalid property");
+				value = value_type();
+				d.deserialize(*value);
+			});
 		}
 	};
 	template <typename DeserializerT, typename ValueT>

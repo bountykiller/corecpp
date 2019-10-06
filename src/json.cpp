@@ -360,6 +360,28 @@ std::unique_ptr<token> tokenizer::next()
 					throw corecpp::syntax_error(reminder());
 				}
 			}
+		case 'n':
+			if(m_position++ != m_buffer.size() && m_buffer[m_position] == 'u'
+				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'l'
+				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'l'
+				&& (m_position++ == m_buffer.size() || !isalnum(m_buffer[m_position], m_locale)))
+			{
+				return std::make_unique<token>(null_token());
+			}
+			else
+			{
+				if (m_position == m_buffer.size())
+				{
+					m_position = position;
+					shrink();
+					return nullptr;
+				}
+				else
+				{
+					m_position = position; /* to stay in a valid state */
+					throw corecpp::syntax_error(reminder());
+				}
+			}
 
 		case 't':
 			if(m_position++ != m_buffer.size() && m_buffer[m_position] == 'r'

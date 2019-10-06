@@ -3,6 +3,9 @@
 
 #include <string>
 #include <string_view>
+#include <tuple>
+
+#include <corecpp/meta/reflection.h>
 
 namespace corecpp
 {
@@ -16,6 +19,14 @@ class uri final
 	std::string_view m_query;
 	std::string_view m_fragment;
 public:
+	static const auto& properties()
+	{
+		static auto result = std::make_tuple(
+			corecpp::make_property("value", &uri::m_value)
+		);
+		return result;
+	}
+
 	explicit uri(const std::string& s)
 	: m_value(s)
 	{
