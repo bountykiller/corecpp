@@ -4,6 +4,8 @@
 #include <inttypes.h>
 #include <array>
 
+#include <corecpp/algorithm.h>
+
 namespace corecpp
 {
 
@@ -37,6 +39,22 @@ public:
 	bool is_nil() const noexcept
 	{
 		return m_data.long_128 == 0;
+	}
+	template <typename SerializerT>
+	void serialize(SerializerT& s) const
+	{
+		s.write_property("hi_value", m_data.long_array[1]);
+		s.write_property("lo_value", m_data.long_array[0]);
+	}
+	template <typename DeserializerT>
+	void deserialize(DeserializerT& d, const std::string& property)
+	{
+		if (property == "hi_value")
+			d.deserialize(m_data.long_array[1]);
+		else if (property == "lo_value")
+			d.deserialize(m_data.long_array[0]);
+		else
+			throw std::runtime_error(corecpp::concat<std::string>({"invalid property ", property}));
 	}
 };
 

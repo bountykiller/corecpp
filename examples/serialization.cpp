@@ -1,3 +1,4 @@
+#include <chrono>
 #include <fstream>
 #include <functional>
 #include <iterator>
@@ -49,17 +50,19 @@ struct group
 };
 struct user
 {
-	int uid;
+	int uid; /* TODO: use a uuid here */
 	std::vector<group> groups;
 	std::string firstname;
 	std::string lastname;
+	std::chrono::system_clock::time_point creation_date;
 	static const auto& properties()
 	{
 		static auto result = std::make_tuple(
 			corecpp::make_property("uid", &user::uid),
 			corecpp::make_property("groups", &user::groups),
 			corecpp::make_property("firstname", &user::firstname),
-			corecpp::make_property("lastname", &user::lastname)
+			corecpp::make_property("lastname", &user::lastname),
+			corecpp::make_property("creation_date", &user::creation_date)
 		);
 		return result;
 	}
@@ -116,8 +119,12 @@ void map_example(void)
 
 int main(int argc, char** argv)
 {
-	corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::trace);
-	static const std::string json_simple = "{\"uid\":1,\"lastname\":\"masse\",\"firstname\":\"jeronimo\",\"groups\":[{\"name\":\"users\",\"id\":1, \"comment\":{}, \"permissions\": { \"value\": 2 }},{\"name\":\"mygroup\",\"id\":2, \"comment\":{ \"value\":\"This is my group\"} }]}";
+	corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::info);
+	static const std::string json_simple =
+		"{\"uid\":1,\"lastname\":\"masse\",\"firstname\":\"jeronimo\",\"creation_date\":1570835059013794610,\"groups\":["
+			"{\"name\":\"users\",\"id\":1, \"comment\":{}, \"permissions\": { \"value\": 2 }},"
+			"{\"name\":\"mygroup\",\"id\":2, \"comment\":{ \"value\":\"This is my group\"} }"
+		"]}";
 	std::istringstream iss;
 
 	std::cout << "\nSIMPLE Type:" << std::endl;
@@ -126,7 +133,9 @@ int main(int argc, char** argv)
 	iss.str(json_simple);
 	corecpp::json::deserializer d(iss);
 	d.deserialize(usr);
-	std::cout << "usr name =>" << usr.firstname << " " << usr.lastname << std::endl;
+	std::time_t created = std::chrono::system_clock::to_time_t(usr.creation_date);
+	std::cout << "usr name =>" << usr.firstname << " " << usr.lastname
+		<< " (created on " << std::put_time(std::localtime(&created), "%c %Z") << ")" << std::endl;
 	std::cout << "Now serialize it!" << std::endl;
 	/* construct a serializer which will write the result on stdout */
 	corecpp::json::serializer s(std::cout);

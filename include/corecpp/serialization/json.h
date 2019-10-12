@@ -338,6 +338,10 @@ namespace corecpp
 			{
 				m_stream << (value ? "true" : "false");
 			}
+			void serialize(int8_t value)
+			{
+				m_stream << value;
+			}
 			void serialize(int16_t value)
 			{
 				m_stream << value;
@@ -559,6 +563,10 @@ namespace corecpp
 					value = false;
 				else
 					throw std::runtime_error(corecpp::concat<std::string>({ "boolean token expected, got ", to_string(tk) }));
+			}
+			void deserialize(int8_t& value)
+			{
+				deserialize_integral(value);
 			}
 			void deserialize(int16_t& value)
 			{

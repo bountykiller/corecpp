@@ -29,13 +29,13 @@ namespace corecpp
 		deferred(deferred&&) = default;
 		value_type& operator*()
 		{
-			if(m_data.which() == 0)
+			if(m_data.index() == 0)
 				evaluate();
 			return m_data.template get<value_type>();
 		}
 		value_type* operator->()
 		{
-			if(m_data.which() == 0)
+			if(m_data.index() == 0)
 				evaluate();
 			return &m_data.template get<value_type>();
 		}
@@ -45,7 +45,7 @@ namespace corecpp
 		}
 		operator bool() const
 		{
-			return (m_data.which() == 0);
+			return (m_data.index() == 0);
 		}
 	};
 

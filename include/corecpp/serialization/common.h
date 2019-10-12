@@ -75,6 +75,17 @@ namespace corecpp
 	template <typename SerializerT, typename ValueT>
 	struct serialize_impl<SerializerT, ValueT,
 						typename std::enable_if<
+							corecpp::is_time_point<std::decay_t<ValueT>>::value>
+							::type>
+	{
+		void operator () (SerializerT& s, ValueT&& value)
+		{
+			s.serialize(value.time_since_epoch().count());
+		}
+	};
+	template <typename SerializerT, typename ValueT>
+	struct serialize_impl<SerializerT, ValueT,
+						typename std::enable_if<
 							is_serializable<std::decay_t<ValueT>, std::decay_t<SerializerT>>::value>
 						::type>
 	{
@@ -178,6 +189,20 @@ namespace corecpp
 		{
 			using underlying_t = std::underlying_type_t<std::decay_t<ValueT>>;
 			d.deserialize(reinterpret_cast<std::add_lvalue_reference_t<underlying_t>>(value));
+		}
+	};
+	template <typename DeserializerT, typename ValueT>
+	struct deserialize_impl<DeserializerT, ValueT,
+						typename std::enable_if<
+							corecpp::is_time_point<std::decay_t<ValueT>>::value>
+							::type>
+	{
+		void operator () (DeserializerT& d, ValueT& value)
+		{
+			typename ValueT::rep ticks;
+			d.deserialize(ticks);
+			value -= value.time_since_epoch(); //reset the value to 0
+			value += typename ValueT::duration { ticks };
 		}
 	};
 	template <typename DeserializerT, typename ValueT>

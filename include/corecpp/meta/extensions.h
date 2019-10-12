@@ -141,6 +141,34 @@ struct is_visitable<T, VisitorT,
 template<typename T, typename V>
 inline constexpr bool is_visitable_v = is_visitable<T,V>::value;
 
+
+/**
+ * @class is_time_point
+ * @brief allows to know if a class represent a point in time
+ */
+template<typename T, typename Enable = void>
+struct is_time_point
+{
+	static constexpr bool value = false;
+};
+
+template<typename T>
+struct is_time_point<T,
+	std::enable_if_t<std::is_arithmetic<typename T::rep>::value
+	&& std::is_class<typename T::period>::value
+	&& std::is_class<typename T::duration>::value
+	&& std::is_class<typename T::clock>::value
+	&& std::is_member_function_pointer<decltype(&T::time_since_epoch)>::value
+	>>
+{
+	static constexpr bool value = true;
+};
+
+template<typename T>
+inline constexpr bool is_time_point_v = is_time_point<T>::value;
+
 }
+
+
 
 #endif
