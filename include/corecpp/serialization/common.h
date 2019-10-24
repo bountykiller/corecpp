@@ -5,6 +5,8 @@
 #include <string>
 #include <typeinfo>
 #include <type_traits>
+#include <locale>
+#include <codecvt>
 
 #include "../meta/extensions.h"
 
@@ -144,21 +146,25 @@ namespace corecpp
 	public:
 		void operator () (DeserializerT& d, ValueT& value)
 		{
-			d.read_object(value, std::remove_reference<ValueT>::type::properties());
+			d.read_object(value, std::remove_reference_t<ValueT>::properties());
 		}
 	};
 	template <typename DeserializerT, typename ValueT>
 	struct deserialize_impl<DeserializerT, ValueT,
-	typename std::enable_if_t<corecpp::is_dereferencable_v<std::decay_t<ValueT>>
-		&& std::is_constructible_v<std::decay_t<ValueT>, std::add_pointer_t<std::decay_t<ValueT>>>> >
+		typename std::enable_if_t<corecpp::is_dereferencable_v<std::decay_t<ValueT>>
+			&& std::is_constructible_v<std::decay_t<ValueT>,
+				std::add_pointer_t<typename std::decay_t<ValueT>::element_type>>> >
 	{
 		void operator () (DeserializerT& d, ValueT& value)
 		{
 			value = ValueT {};
-			d.read_object([&](const std::wstring& property){
+			d.read_object_cb([&](const std::wstring& property){
 				using value_type = typename std::remove_reference<decltype(*value)>::type;
 				if (property != L"value")
-					throw std::runtime_error("invalid property");
+				{
+					std::string name = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>{}.to_bytes(property.data());
+					throw std::runtime_error(corecpp::concat<std::string>({ "invalid property ", name}));
+				}
 				value = ValueT(new value_type());
 				d.deserialize(*value);
 			});
@@ -175,7 +181,10 @@ namespace corecpp
 			d.read_object_cb([&](const std::wstring& property){
 				using value_type = typename std::remove_reference<decltype(*value)>::type;
 				if (property != L"value")
-					throw std::runtime_error("invalid property");
+				{
+					std::string name = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>{}.to_bytes(property.data());
+					throw std::runtime_error(corecpp::concat<std::string>({ "invalid property ", name}));
+				}
 				value = value_type();
 				d.deserialize(*value);
 			});
@@ -219,7 +228,7 @@ namespace corecpp
 	};
 	template <typename DeserializerT, typename ValueT>
 	struct deserialize_impl<DeserializerT, ValueT,
-						typename std::enable_if<is_associative<std::decay_t<ValueT>>::value>::type>
+		typename std::enable_if<is_associative<std::decay_t<ValueT>>::value>::type>
 	{
 		void operator () (DeserializerT& d, ValueT& value)
 		{
@@ -231,8 +240,8 @@ namespace corecpp
 	};
 	template <typename DeserializerT, typename ValueT>
 	struct deserialize_impl<DeserializerT, ValueT,
-							typename std::enable_if<!is_associative<std::decay_t<ValueT>>::value
-								&& is_iterable<std::decay_t<ValueT>>::value>::type>
+		typename std::enable_if<!is_associative<std::decay_t<ValueT>>::value
+			&& is_iterable<std::decay_t<ValueT>>::value>::type>
 	{
 		void operator () (DeserializerT& d, ValueT& value)
 		{

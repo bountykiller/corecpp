@@ -28,6 +28,7 @@ public:
 	explicit contiguous_iterator(pointer value) noexcept
 	: m_value(value)
 	{}
+	contiguous_iterator(const contiguous_iterator&) = default;
 	reference operator*() noexcept
 	{
 		return *m_value;
@@ -63,7 +64,11 @@ public:
 	{
 		return m_value[pos];
 	}
-
+	contiguous_iterator& operator=(const contiguous_iterator& other)
+	{
+		m_value = other.m_value;
+		return *this;
+	}
 	iterator& operator+=(difference_type pos) noexcept
 	{
 		m_value += pos;
@@ -86,12 +91,12 @@ public:
 		return iterator(m_value - pos);
 	}
 
-	bool operator == (iterator &other)
+	bool operator == (iterator other)
 	{
 		return other.m_value == m_value;
 	}
 
-	bool operator != (iterator &other)
+	bool operator != (iterator other)
 	{
 		return other.m_value != m_value;
 	}

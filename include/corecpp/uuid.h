@@ -58,8 +58,7 @@ public:
 	}
 };
 
-const uuid uuid::nil { 0 };
-
+const inline uuid uuid::nil = { 0 };
 
 }
 

@@ -2,6 +2,7 @@
 #include <locale>
 #include <memory>
 #include <cmath>
+#include <iomanip>
 
 #include <corecpp/algorithm.h>
 #include <corecpp/serialization/common.h>
@@ -769,7 +770,7 @@ void serializer::convert_and_escape(const std::wstring& value)
 {
 	static const char hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 	/* TODO: support not only UTF8 */
-	for(wchar_t c : value)
+	for (wchar_t c : value)
 	{
 		if (std::isprint((char)c))
 			m_stream << (char)c;
@@ -799,6 +800,104 @@ void serializer::convert_and_escape(const std::wstring& value)
 			throw std::range_error(corecpp::concat<std::string>({ "Unable to convert charcode ", std::to_string((uint32_t)c) }));
 	}
 }
+
+
+void serializer::convert_and_escape(const std::u16string& value)
+{
+	static const char hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+	/* TODO: support not only UTF8 */
+	for (char16_t c : value)
+	{
+		if (std::isprint((char)c))
+			m_stream << (char)c;
+		else if (c < 0x10)
+			m_stream << "\\u000" << hex_chars[c & 0x0F];
+		else if (c < 0x100)
+			m_stream << "\\u00" << hex_chars[(c & 0xF0) << 4] << hex_chars[c & 0x0F];
+		else if (c <= 0x7FF)
+		{
+			m_stream << (c >> 6) + 0xC0;
+			m_stream << (c & 0x3F) + 0x80;
+		}
+		else if (c <= 0xFFFF)
+		{
+			m_stream << (c >> 12) + 0xE0;
+			m_stream << ((c >> 6) & 0x3F) + 0x80;
+			m_stream << (c & 0x3F) + 0x80;
+		}
+		else
+			throw std::range_error(corecpp::concat<std::string>({ "Unable to convert charcode ", std::to_string((uint32_t)c) }));
+	}
+}
+
+
+void serializer::convert_and_escape(const std::u32string& value)
+{
+	static const char hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+	/* TODO: support not only UTF8 */
+	for (char32_t c : value)
+	{
+		if (std::isprint((char)c))
+			m_stream << (char)c;
+		else if (c < 0x10)
+			m_stream << "\\u000" << hex_chars[c & 0x0F];
+		else if (c < 0x100)
+			m_stream << "\\u00" << hex_chars[(c & 0xF0) << 4] << hex_chars[c & 0x0F];
+		else if (c <= 0x7FF)
+		{
+			m_stream << (c >> 6) + 0xC0;
+			m_stream << (c & 0x3F) + 0x80;
+		}
+		else if (c <= 0xFFFF)
+		{
+			m_stream << (c >> 12) + 0xE0;
+			m_stream << ((c >> 6) & 0x3F) + 0x80;
+			m_stream << (c & 0x3F) + 0x80;
+		}
+		else if (c <= 0x10FFFF)
+		{
+			m_stream << (c >> 18) + 0xF0;
+			m_stream << ((c >> 12) & 0x3F) + 0x80;
+			m_stream << ((c >> 6) & 0x3F) + 0x80;
+			m_stream << (c & 0x3F) + 0x80;
+		}
+		else
+			throw std::range_error(corecpp::concat<std::string>({ "Unable to convert charcode ", std::to_string((uint32_t)c) }));
+	}
+}
+
+
+void deserializer::read_string(const string_token& wstr, std::string& value)
+{
+	const wchar_t* wchar = wstr.value.data();
+	std::mbstate_t state = std::mbstate_t();
+	auto len = std::wcsrtombs(nullptr, &wchar, 0, &state);
+	if (len == static_cast<std::size_t>(-1))
+		throw std::runtime_error("converion error");
+	value.resize(len);
+	std::wcsrtombs((char*)value.data(), &wchar, len, &state);
+}
+
+
+void deserializer::read_string(const string_token& wstr, std::u16string& value)
+{
+	const wchar_t* wchar = wstr.value.data();
+	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> convw;
+	auto u8 = convw.to_bytes(wchar, wchar + wstr.value.size());
+	std::wstring_convert<std::codecvt_utf8<char16_t>, char16_t> conv16;
+	value = conv16.from_bytes(u8);
+}
+
+
+void deserializer::read_string(const string_token& wstr, std::u32string& value)
+{
+	const wchar_t* wchar = wstr.value.data();
+	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> convw;
+	auto u8 = convw.to_bytes(wchar, wchar + wstr.value.size());
+	std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv32;
+	value = conv32.from_bytes(u8);
+}
+
 
 token deserializer::read()
 {

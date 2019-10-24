@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <corecpp/algorithm.h>
+#include <corecpp/net/mailaddress.h>
 #include <corecpp/serialization/json.h>
 #include <corecpp/flags.h>
 
@@ -51,9 +52,10 @@ struct group
 struct user
 {
 	int uid; /* TODO: use a uuid here */
-	std::vector<group> groups;
+	std::vector<std::shared_ptr<group>> groups;
 	std::string firstname;
 	std::string lastname;
+	std::unique_ptr<corecpp::net::mailaddress> email;
 	std::chrono::system_clock::time_point creation_date;
 	static const auto& properties()
 	{
@@ -62,6 +64,7 @@ struct user
 			corecpp::make_property("groups", &user::groups),
 			corecpp::make_property("firstname", &user::firstname),
 			corecpp::make_property("lastname", &user::lastname),
+			corecpp::make_property("email", &user::email),
 			corecpp::make_property("creation_date", &user::creation_date)
 		);
 		return result;
@@ -122,8 +125,8 @@ int main(int argc, char** argv)
 	corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::info);
 	static const std::string json_simple =
 		"{\"uid\":1,\"lastname\":\"masse\",\"firstname\":\"jeronimo\",\"creation_date\":1570835059013794610,\"groups\":["
-			"{\"name\":\"users\",\"id\":1, \"comment\":{}, \"permissions\": { \"value\": 2 }},"
-			"{\"name\":\"mygroup\",\"id\":2, \"comment\":{ \"value\":\"This is my group\"} }"
+			"{ \"value\": {\"name\":\"users\",\"id\":1, \"comment\":{}, \"permissions\": { \"value\": 2 }} },"
+			"{ \"value\": {\"name\":\"mygroup\",\"id\":2, \"comment\":{ \"value\":\"This is my group\"} } }"
 		"]}";
 	std::istringstream iss;
 

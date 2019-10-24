@@ -10,6 +10,9 @@
 namespace corecpp
 {
 
+namespace net
+{
+
 class uri final
 {
 	std::string m_value;
@@ -27,16 +30,45 @@ public:
 		return result;
 	}
 
-	explicit uri(const std::string& s)
-	: m_value(s)
+	uri()
 	{
-		/* TODO : parse the given string */
+		/* TODO */
 	}
-	explicit uri(const uri& other)
+	uri(const uri& other)
 	: uri(other.m_value)
 	{
 		/* TODO : could be optimized to avoid reparsing the uri by copying the views and change their start pointer */
 	}
+	uri(uri&& other)
+	: uri(std::move(other.m_value))
+	{
+		/* TODO : could be optimized to avoid reparsing the uri by copying the views and change their start pointer */
+	}
+	explicit uri(std::string s)
+	: m_value { std::move(s) }
+	{
+		/* TODO : parse the given string */
+	}
+
+	uri& operator = (const uri& other)
+	{
+		m_value = other.m_value;
+		/* TODO : copying the views and change their start pointer */
+		return *this;
+	}
+	uri& operator = (uri&& other)
+	{
+		m_value = std::move(other.m_value);
+		/* TODO : copying the views and change their start pointer */
+		return *this;
+	}
+	uri& operator = (std::string value)
+	{
+		m_value = std::move(value);
+		/* TODO : parse the given string */
+		return *this;
+	}
+
 	const std::string& str() const
 	{
 		return m_value;
@@ -63,9 +95,11 @@ public:
 	}
 };
 
-std::string to_string(const uri& u)
+static inline const std::string& to_string(const uri& u)
 {
 	return u.str();
+}
+
 }
 
 }

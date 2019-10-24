@@ -387,26 +387,26 @@ public:
 			throw std::overflow_error(std::to_string(index));
 		return m_block->m_reserved;
 	}
-	iterator begin() noexcept
-	{
-		return iterator(m_block->m_data);
-	}
 	const_iterator begin() const noexcept
 	{
 		return const_iterator(m_block->m_data);
+	}
+	iterator begin() noexcept
+	{
+		return iterator(m_block->m_data);
 	}
 	const_iterator cbegin() const noexcept
 	{
 		return const_iterator(m_block->m_data);
 	}
 
-	iterator end() noexcept
-	{
-		return iterator(&m_block->m_data[size()]);
-	}
 	const_iterator end() const noexcept
 	{
 		return const_iterator(&m_block->m_data[size()]);
+	}
+	iterator end() noexcept
+	{
+		return iterator(&m_block->m_data[size()]);
 	}
 	const_iterator cend() const noexcept
 	{

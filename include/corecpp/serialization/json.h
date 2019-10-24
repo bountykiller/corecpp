@@ -331,6 +331,8 @@ namespace corecpp
 			bool m_first = true;
 			void convert_and_escape(const std::string& value);
 			void convert_and_escape(const std::wstring& value);
+			void convert_and_escape(const std::u16string& value);
+			void convert_and_escape(const std::u32string& value);
 		public:
 			serializer(std::ostream& s) : m_stream(s)
 			{}
@@ -359,6 +361,10 @@ namespace corecpp
 				m_stream << value;
 			}
 			void serialize(uint16_t value)
+			{
+				m_stream << value;
+			}
+			void serialize(char16_t value)
 			{
 				m_stream << value;
 			}
@@ -401,6 +407,18 @@ namespace corecpp
 				m_stream << '"';
 			}
 			void serialize(const std::wstring& value)
+			{
+				m_stream << '"';
+				convert_and_escape(value);
+				m_stream << '"';
+			}
+			void serialize(const std::u16string& value)
+			{
+				m_stream << '"';
+				convert_and_escape(value);
+				m_stream << '"';
+			}
+			void serialize(const std::u32string& value)
 			{
 				m_stream << '"';
 				convert_and_escape(value);
@@ -483,8 +501,8 @@ namespace corecpp
 			void write_array(ValueT&& value)
 			{
 				begin_array<ValueT>();
-				for (typename std::decay_t<ValueT>::const_iterator iter = std::begin(value);
-					iter != std::end(value);
+				for (typename std::decay_t<ValueT>::const_iterator iter = std::cbegin(value);
+					iter != std::cend(value);
 					++iter)
 					write_element(*iter);
 				end_array();
@@ -493,8 +511,8 @@ namespace corecpp
 			void write_associative_array(ValueT&& value)
 			{
 				begin_array<ValueT>();
-				for (typename std::decay_t<ValueT>::const_iterator iter = std::begin(value);
-					iter != std::end(value);
+				for (typename std::decay_t<ValueT>::const_iterator iter = std::cbegin(value);
+					iter != std::cend(value);
 					++iter)
 				{
 					if (!m_first)
@@ -540,16 +558,9 @@ namespace corecpp
 					throw std::overflow_error(std::to_string(result));
 				value = result;
 			}
-			void read_string(const string_token& wstr, std::string& value)
-			{
-				const wchar_t* wchar = wstr.value.data();
-				std::mbstate_t state = std::mbstate_t();
-				auto len = std::wcsrtombs(nullptr, &wchar, 0, &state);
-				if (len == static_cast<std::size_t>(-1))
-					throw std::runtime_error("converion error");
-				value.resize(len);
-				std::wcsrtombs((char*)value.data(), &wchar, len, &state);
-			}
+			void read_string(const string_token& wstr, std::string& value);
+			void read_string(const string_token& wstr, std::u16string& value);
+			void read_string(const string_token& wstr, std::u32string& value);
 		public:
 			deserializer(std::istream& s)
 			: m_stream(s), m_tokenizer(), m_first(true)
@@ -623,6 +634,20 @@ namespace corecpp
 				if (tk.index() != token::index_of<string_token>::value)
 					throw std::runtime_error(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
 				value = std::move(tk.get<string_token>().value);
+			}
+			void deserialize(std::u16string& value)
+			{
+				token tk = read();
+				if (tk.index() != token::index_of<string_token>::value)
+					throw std::runtime_error(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
+				read_string(tk.get<string_token>(), value);
+			}
+			void deserialize(std::u32string& value)
+			{
+				token tk = read();
+				if (tk.index() != token::index_of<string_token>::value)
+					throw std::runtime_error(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
+				read_string(tk.get<string_token>(), value);
 			}
 			template <typename ValueT, typename Enable = void>
 			void deserialize(ValueT& value)
