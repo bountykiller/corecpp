@@ -16,6 +16,7 @@
 #include <corecpp/algorithm.h>
 #include <corecpp/diagnostic.h>
 #include <corecpp/variant.h>
+#include <corecpp/except.h>
 #include <corecpp/serialization/common.h>
 
 namespace corecpp
@@ -76,31 +77,17 @@ namespace corecpp
 
 		class tokenizer
 		{
-			std::string m_buffer;
-			std::string::size_type m_position;
+			using pos_type = std::streambuf::pos_type;
+			std::streambuf& m_buffer;
 			std::locale m_locale;
 
 			wchar_t read_escaped_char();
 			std::unique_ptr<token> read_string_literal();
-			std::unique_ptr<token> read_numeric_literal();
-			void shrink()
-			{
-				if (!m_position)
-					return;
-				m_buffer.assign(m_buffer.begin() + m_position, m_buffer.end());
-				m_position = 0;
-			}
+			std::unique_ptr<token> read_numeric_literal(char c);
 		public:
-			tokenizer()
-			: m_buffer(), m_position(0), m_locale("en_US.utf8")
+			tokenizer(std::streambuf& buffer)
+			: m_buffer(buffer), m_locale(m_buffer.getloc())
 			{}
-			/**
-			 * \brief aliment the tokenizer so that it can read the next tokens
-			 */
-			void eat(const std::string& str)
-			{
-				m_buffer.append(str);
-			}
 			/**
 			 * \brief extract the next token
 			 * \return a pointer to the next token, or an empty unique_ptr if no more token to read.
@@ -114,14 +101,10 @@ namespace corecpp
 			 */
 			std::string reminder() const
 			{
-				return m_buffer.substr(m_position);
-			}
-			/**
-			 * \brief return false if there is still unread characters, true otherwise
-			 */
-			bool done() const
-			{
-				return (m_buffer.length() == 0);
+				std::string res;
+				res.resize(m_buffer.in_avail());
+				m_buffer.sgetn(res.data(), m_buffer.in_avail());
+				return res;
 			}
 		};
 
@@ -314,7 +297,7 @@ namespace corecpp
 			void start(void)
 			{
 				if (!m_stack.empty())
-					throw std::logic_error("last parsing not finished, can't start a new one!");
+					throws<std::logic_error>("last parsing not finished, can't start a new one!");
 				m_stack.emplace_back(RuleT{});
 			}
 			void push(token&& tk);
@@ -322,8 +305,7 @@ namespace corecpp
 		};
 
 		/* TODO:
-		 * Add serialization/deserialization of char
-		 * Add serialization/deserialization of strong enums
+		 * Add pretty printinf managment
 		 */
 		class serializer
 		{
@@ -400,6 +382,8 @@ namespace corecpp
 				convert_and_escape(value);
 				m_stream << '"';
 			}
+			/* TODO: Allows string to be r-value references
+			 */
 			void serialize(const std::string& value)
 			{
 				m_stream << '"';
@@ -481,6 +465,17 @@ namespace corecpp
 				serialize(value);
 				m_first = false;
 			}
+			template <typename StringT, typename FuncT>
+			void write_property_cb(const StringT& name, FuncT func)
+			{
+				if (!m_first)
+					m_stream << ',';
+				serialize(name);
+				m_stream << ':';
+				func();
+				m_first = false;
+			}
+
 			template <typename ValueT, typename PropertiesT>
 			void write_object(ValueT&& value, const PropertiesT& properties)
 			{
@@ -497,6 +492,7 @@ namespace corecpp
 				func(std::forward<ValueT>(value));
 				end_object();
 			}
+
 			template <typename ValueT>
 			void write_array(ValueT&& value)
 			{
@@ -539,11 +535,11 @@ namespace corecpp
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<integral_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "integral token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "integral token expected, got ", to_string(tk) }));
 				auto result = tk.get<integral_token>().value;
 				if (result > std::numeric_limits<IntegralT>::max()
 					|| result < std::numeric_limits<IntegralT>::lowest())
-					throw std::overflow_error(std::to_string(result));
+					corecpp::throws<std::overflow_error>(std::to_string(result));
 				value = result;
 			}
 			template<typename FloatT, typename = std::enable_if<std::is_integral<FloatT>::value, FloatT>>
@@ -551,11 +547,11 @@ namespace corecpp
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<numeric_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "numeric token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "numeric token expected, got ", to_string(tk) }));
 				auto result = tk.get<numeric_token>().value;
 				if (result > std::numeric_limits<FloatT>::max()
 					|| result < std::numeric_limits<FloatT>::lowest())
-					throw std::overflow_error(std::to_string(result));
+					corecpp::throws<std::overflow_error>(std::to_string(result));
 				value = result;
 			}
 			void read_string(const string_token& wstr, std::string& value);
@@ -563,7 +559,7 @@ namespace corecpp
 			void read_string(const string_token& wstr, std::u32string& value);
 		public:
 			deserializer(std::istream& s)
-			: m_stream(s), m_tokenizer(), m_first(true)
+			: m_stream(s), m_tokenizer(*s.rdbuf()), m_first(true)
 			{}
 			void deserialize(bool& value)
 			{
@@ -573,7 +569,7 @@ namespace corecpp
 				else if (tk.index() == token::index_of<false_token>::value)
 					value = false;
 				else
-					throw std::runtime_error(corecpp::concat<std::string>({ "boolean token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "boolean token expected, got ", to_string(tk) }));
 			}
 			void deserialize(int8_t& value)
 			{
@@ -607,11 +603,15 @@ namespace corecpp
 			{
 				deserialize_integral(value);
 			}
+			void deserialize(char16_t value)
+			{
+				deserialize_integral(value);
+			}
 			void deserialize(std::nullptr_t)
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<null_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "null token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "null token expected, got ", to_string(tk) }));
 			}
 			void deserialize(float& value)
 			{
@@ -625,28 +625,28 @@ namespace corecpp
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<string_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
 				read_string(tk.get<string_token>(), value);
 			}
 			void deserialize(std::wstring& value)
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<string_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
 				value = std::move(tk.get<string_token>().value);
 			}
 			void deserialize(std::u16string& value)
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<string_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
 				read_string(tk.get<string_token>(), value);
 			}
 			void deserialize(std::u32string& value)
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<string_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "string token expected, got ", to_string(tk) }));
 				read_string(tk.get<string_token>(), value);
 			}
 			template <typename ValueT, typename Enable = void>
@@ -663,13 +663,13 @@ namespace corecpp
 				m_first = true;
 				token tk = read();
 				if (tk.index() != token::index_of<open_brace_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(tk) }));
 			}
 			void end_object()
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<close_brace_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "close brace token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace token expected, got ", to_string(tk) }));
 			}
 
 			template <typename ValueT>
@@ -678,14 +678,14 @@ namespace corecpp
 				m_first = true;
 				token tk = read();
 				if (tk.index() != token::index_of<open_bracket_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "open bracket token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open bracket token expected, got ", to_string(tk) }));
 			}
 			void end_array()
 			{
 				m_first = false;
 				token tk = read();
 				if (tk.index() != token::index_of<close_bracket_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(tk) }));
 			}
 			template <typename ValueT>
 			void read_element(ValueT& value)
@@ -694,9 +694,21 @@ namespace corecpp
 				{
 					auto tk = read();
 					if (tk.index() != token::index_of<comma_token>::value)
-						throw std::runtime_error(corecpp::concat<std::string>({ "comma token expected, got ", to_string(tk) }));
+						corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "comma token expected, got ", to_string(tk) }));
 				}
 				deserialize(value);
+				m_first = false;
+			}
+			template <typename FuncT>
+			void read_element_cb(FuncT func)
+			{
+				if (!m_first)
+				{
+					auto tk = read();
+					if (tk.index() != token::index_of<comma_token>::value)
+						corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "comma token expected, got ", to_string(tk) }));
+				}
+				func();
 				m_first = false;
 			}
 			template <typename ValueT>
@@ -704,7 +716,7 @@ namespace corecpp
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<open_brace_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(tk) }));
 
 				for (tk = read(); tk.index() == token::index_of<string_token>::value; tk = read())
 				{
@@ -712,28 +724,28 @@ namespace corecpp
 					read_string(tk.get<string_token>(), pname);
 					tk = read();
 					if (tk.index() != token::index_of<colon_token>::value)
-						throw std::runtime_error(corecpp::concat<std::string>({ "colon token expected, got ", to_string(tk) }));
+						corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "colon token expected, got ", to_string(tk) }));
 					value.deserialize(*this, pname);
 					tk = read();
 					if (tk.index() != token::index_of<comma_token>::value)
 						break;
 				}
 				if (tk.index() != token::index_of<close_brace_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "close brace token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace token expected, got ", to_string(tk) }));
 			}
 			template <typename ValueT, typename PropertiesT>
 			void read_object(ValueT& value, const PropertiesT& properties)
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<open_brace_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(tk) }));
 
 				for (tk = read(); tk.index() == token::index_of<string_token>::value; tk = read())
 				{
 					std::wstring pname = std::move(tk.get<string_token>().value);
 					tk = read();
 					if (tk.index() != token::index_of<colon_token>::value)
-						throw std::runtime_error(corecpp::concat<std::string>({ "colon token expected, got ", to_string(tk) }));
+						corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "colon token expected, got ", to_string(tk) }));
 					tuple_apply([&](const auto& prop) {
 						if (prop.name() == pname)
 							this->deserialize(prop.get(value));
@@ -743,34 +755,34 @@ namespace corecpp
 						break;
 				}
 				if (tk.index() != token::index_of<close_brace_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "close brace expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace expected, got ", to_string(tk) }));
 			}
 			void read_object_cb(std::function<void(const std::wstring&)> func)
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<open_brace_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(tk) }));
 
 				for (tk = read(); tk.index() == token::index_of<string_token>::value; tk = read())
 				{
 					std::wstring pname = std::move(tk.get<string_token>().value);
 					tk = read();
 					if (tk.index() != token::index_of<colon_token>::value)
-						throw std::runtime_error(corecpp::concat<std::string>({ "colon token expected, got ", to_string(tk) }));
+						corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "colon token expected, got ", to_string(tk) }));
 					func(pname);
 					tk = read();
 					if (tk.index() != token::index_of<comma_token>::value)
 						break;
 				}
 				if (tk.index() != token::index_of<close_brace_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "close brace expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace expected, got ", to_string(tk) }));
 			}
 			template <typename ValueT>
 			void read_array(ValueT& value)
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<open_bracket_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "open bracket token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open bracket token expected, got ", to_string(tk) }));
 				do
 				{
 					using ElemT = typename ValueT::value_type;
@@ -781,14 +793,14 @@ namespace corecpp
 					tk = read();
 				} while (tk.index() == token::index_of<comma_token>::value);
 				if (tk.index() != token::index_of<close_bracket_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(tk) }));
 			}
 			template <typename ValueT>
 			void read_associative_array(ValueT& value)
 			{
 				token tk = read();
 				if (tk.index() != token::index_of<open_bracket_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "open bracket token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open bracket token expected, got ", to_string(tk) }));
 				do
 				{
 					using KeyT = typename ValueT::key_type;
@@ -804,7 +816,7 @@ namespace corecpp
 					tk = read();
 				} while (tk.index() == token::index_of<comma_token>::value);
 				if (tk.index() != token::index_of<close_bracket_token>::value)
-					throw std::runtime_error(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(tk) }));
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(tk) }));
 			}
 		};
 	}

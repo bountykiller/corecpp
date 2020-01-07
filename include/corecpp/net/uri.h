@@ -1,10 +1,13 @@
 #ifndef CORECPP_NET_URI_H
 #define CORECPP_NET_URI_H
 
+#include <cassert>
+
 #include <string>
 #include <string_view>
 #include <tuple>
 
+#include <corecpp/except.h>
 #include <corecpp/meta/reflection.h>
 
 namespace corecpp
@@ -12,15 +15,24 @@ namespace corecpp
 
 namespace net
 {
-
+/* RFC 3986
+ * URI = scheme ":" hier-part [ "?" query ] [ "#" fragment ]
+ */
 class uri final
 {
 	std::string m_value;
 	std::string_view m_scheme;
 	std::string_view m_authority;
+	std::string_view m_userinfo;
+	std::string_view m_host;
+	std::string_view m_port;
 	std::string_view m_path;
 	std::string_view m_query;
 	std::string_view m_fragment;
+
+
+	void parse();
+
 public:
 	static const auto& properties()
 	{
@@ -32,7 +44,6 @@ public:
 
 	uri()
 	{
-		/* TODO */
 	}
 	uri(const uri& other)
 	: uri(other.m_value)
@@ -47,7 +58,7 @@ public:
 	explicit uri(std::string s)
 	: m_value { std::move(s) }
 	{
-		/* TODO : parse the given string */
+		parse();
 	}
 
 	uri& operator = (const uri& other)
@@ -65,7 +76,7 @@ public:
 	uri& operator = (std::string value)
 	{
 		m_value = std::move(value);
-		/* TODO : parse the given string */
+		parse();
 		return *this;
 	}
 

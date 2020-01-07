@@ -56,7 +56,7 @@ std::string to_string(const token& tk)
 		case token::index_of<false_token>::value:
 			return "false";
 	}
-	throw std::runtime_error("unreachable");
+	corecpp::throws<std::logic_error>("unreachable");
 }
 
 wchar_t tokenizer::read_escaped_char()
@@ -82,31 +82,32 @@ wchar_t tokenizer::read_escaped_char()
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	};
 
-	assert (m_position + 4 <= m_buffer.size());
+	assert (m_buffer.in_avail() >= 4);
 
 	wchar_t a,b,c,d;
-	a = conversion_tab[(int)m_buffer[++m_position]];
-	b = conversion_tab[(int)m_buffer[++m_position]];
-	c = conversion_tab[(int)m_buffer[++m_position]];
-	d = conversion_tab[(int)m_buffer[++m_position]];
+	a = conversion_tab[(int)m_buffer.sbumpc()];
+	b = conversion_tab[(int)m_buffer.sbumpc()];
+	c = conversion_tab[(int)m_buffer.sbumpc()];
+	d = conversion_tab[(int)m_buffer.sbumpc()];
 	if ((a < 0) || (b < 0) || (c < 0) || (d < 0))
-		throw lexical_error(corecpp::concat<std::string>({"invalid unicode escape sequence: ", std::to_string(a), ",",
+		corecpp::throws<lexical_error>(corecpp::concat<std::string>({"invalid unicode escape sequence: ", std::to_string(a), ",",
 											std::to_string(b),  ",", std::to_string(c),  ",", std::to_string(d)}));
 	return (a << 12) + (b << 8) + (c << 4) + d;
 }
 
 std::unique_ptr<token> tokenizer::read_string_literal()
 {
-	if(++m_position == m_buffer.size())
+	if (m_buffer.in_avail() <= 0)
 		return nullptr;
 
 	std::wstring literal;
 	bool good = false;
-	do
+
+	while (!good && (m_buffer.in_avail() > 0))
 	{
-		json_logger().debug("string_literal : read char",
-			corecpp::concat<std::string>({ std::string(1, m_buffer[m_position]), " at pos ", std::to_string(m_position) }), __FILE__, __LINE__);
-		switch(m_buffer[m_position])
+		int c = m_buffer.sbumpc();
+		json_logger().debug("string_literal : read char", std::string(1, c), __FILE__, __LINE__);
+		switch (c)
 		{
 			case '\"':
 				good = true;
@@ -114,11 +115,11 @@ std::unique_ptr<token> tokenizer::read_string_literal()
 			/* control-characters */
 			case '\r':
 			case '\n':
-				throw lexical_error("invalid string expression : unexpected end of line");
+				corecpp::throws<lexical_error>("invalid string expression : unexpected end of line");
 			case '\\':
-				if(++m_position == m_buffer.size())
+				if (m_buffer.in_avail() <= 0)
 					return nullptr;
-				switch(m_buffer[m_position])
+				switch (c = m_buffer.sbumpc())
 				{
 					case '"': literal += '"'; break;
 					case '\\': literal += '\\'; break;
@@ -129,21 +130,20 @@ std::unique_ptr<token> tokenizer::read_string_literal()
 					case 'r': literal += '\r'; break;
 					case 't': literal += '\t'; break;
 					case 'u':
-						if (m_position + 4 > m_buffer.size())
-							throw lexical_error("invalid string expression : unterminated escape sequence");
+						if (m_buffer.in_avail() < 4)
+							corecpp::throws<lexical_error>("invalid string expression : unterminated escape sequence");
 						/* \u four-hex-digits */
 						literal += read_escaped_char();
 						break;
 					default:
-						throw lexical_error("invalid string expression : unknown escape sequence");
+						corecpp::throws<lexical_error>("invalid string expression : unknown escape sequence");
 				}
 				break;
 			default:
-				literal += m_buffer[m_position];
+				literal += c;
 				break;
 		}
 	}
-	while (++m_position != m_buffer.size() && !good);
 
 	if(!good)
 		return nullptr;
@@ -152,19 +152,22 @@ std::unique_ptr<token> tokenizer::read_string_literal()
 	return std::make_unique<token>(string_token { literal });
 }
 
-std::unique_ptr<token> tokenizer::read_numeric_literal()
+std::unique_ptr<token> tokenizer::read_numeric_literal(char c)
 {
 	bool negative = false;
 	long integral_value = 0;
-	bool done = false;
-	if (m_buffer[m_position] == '-')
+
+	if (c == '-')
 	{
+		if (m_buffer.in_avail() <= 0)
+			return nullptr;
 		negative = true;
-		++m_position;
+		c = m_buffer.sbumpc();
 	}
-	do
+
+	for(; m_buffer.in_avail() >= 0; c = m_buffer.sbumpc())
 	{
-		switch(m_buffer[m_position])
+		switch (c)
 		{
 			case '0':
 			case '1':
@@ -176,15 +179,16 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 			case '7':
 			case '8':
 			case '9':
-				integral_value = (10 * integral_value) + (m_buffer[m_position] - '0');
+				integral_value = (10 * integral_value) + (c - '0');
 				break;
 			case '.':
 			{
 				long decimal_value = 0;
 				unsigned int decimal_precision = 1;
-				while(!done && ++m_position != m_buffer.size())
+				while (m_buffer.in_avail() >= 0)
 				{
-					switch(m_buffer[m_position])
+					c = m_buffer.sbumpc();
+					switch (c)
 					{
 						case '0':
 						case '1':
@@ -196,7 +200,7 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 						case '7':
 						case '8':
 						case '9':
-							decimal_value = (10 * decimal_value) + (m_buffer[m_position] - '0');
+							decimal_value = (10 * decimal_value) + (c - '0');
 							decimal_precision *= 10;
 							break;
 						case 'e':
@@ -204,18 +208,22 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 						{
 							long exponential_value = 0;
 							bool negative_exponential = false;
-							if (m_buffer[m_position] == '-')
+
+							if (m_buffer.in_avail() < 0)
+								return nullptr;
+
+							c = m_buffer.sbumpc();
+							if (c == '-' || c == '+')
 							{
-								negative_exponential = true;
-								++m_position;
+								negative_exponential = (c == '-');
+								if (m_buffer.in_avail() < 0)
+									return nullptr;
+								c = m_buffer.sbumpc();
 							}
-							else if (m_buffer[m_position] == '+')
+
+							for (; m_buffer.in_avail() >= 0; c = m_buffer.sbumpc())
 							{
-								++m_position;
-							}
-							while(!done && ++m_position != m_buffer.size())
-							{
-								switch(m_buffer[m_position])
+								switch(c)
 								{
 									case '0':
 									case '1':
@@ -227,11 +235,12 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 									case '7':
 									case '8':
 									case '9':
-										exponential_value = (10 * decimal_value) + (m_buffer[m_position] - '0');
+										exponential_value = (10 * decimal_value) + (c - '0');
 										break;
 									default:
 									{
 										double value = exp((double)integral_value + ((double)decimal_value/decimal_precision));
+										m_buffer.sungetc();
 										return std::make_unique<token>(numeric_token { negative ? -value : value });
 									}
 								}
@@ -241,6 +250,7 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 						default:
 						{
 							double value = (double)integral_value + ((double)decimal_value/decimal_precision);
+							m_buffer.sungetc();
 							return std::make_unique<token>(numeric_token { negative ? -value : value });
 						}
 					}
@@ -248,74 +258,71 @@ std::unique_ptr<token> tokenizer::read_numeric_literal()
 				break;
 			}
 			default:
+				m_buffer.sungetc();
 				return std::make_unique<token>(integral_token { negative ? -integral_value : integral_value });
 		}
 	}
-	while(++m_position != m_buffer.size());
 
 	return nullptr;
 }
 
 std::unique_ptr<token> tokenizer::next()
 {
-	if(m_position == m_buffer.size())
+	char c;
+	if (m_buffer.in_avail() <= 0)
 	{
-		json_logger().trace("No more token to parse",
-						   corecpp::concat<std::string>({ "at pos ", std::to_string(m_position) }), __FILE__, __LINE__);
-		shrink();
-		return nullptr;
-	}
-	while (std::isspace(m_buffer[m_position], m_locale))
-	{
-		if(++m_position == m_buffer.size())
+		m_buffer.pubsync();
+		if (m_buffer.in_avail() <= 0)
 		{
-			json_logger().trace("Skipped blank caracters, no more token to parse",
-						   corecpp::concat<std::string>({ "at pos ", std::to_string(m_position) }), __FILE__, __LINE__);
-			shrink();
+			json_logger().trace("No more token to parse", __FILE__, __LINE__);
 			return nullptr;
 		}
 	}
-	auto position = m_position;
-	switch(m_buffer[m_position])
+
+	for (c = m_buffer.sbumpc(); std::isspace(c, m_locale); c = m_buffer.sbumpc())
+	{
+		if (m_buffer.in_avail() <= 0)
+		{
+			json_logger().trace("Skipped blank caracters, no more token to parse", __FILE__, __LINE__);
+			return nullptr;
+		}
+		json_logger().trace("Skipped blank caracter", __FILE__, __LINE__);
+	}
+
+	pos_type pos = m_buffer.pubseekoff(0, std::ios_base::cur, std::ios_base::in);
+	json_logger().debug("parse token", corecpp::concat<std::string>({ "at pos ", std::to_string(pos), "'", std::to_string(c), "'"  }),
+			__FILE__, __LINE__);
+	switch (c)
 	{
 		case '{':
 		{
-			++m_position;
 			return std::make_unique<token>(open_brace_token());
 		}
 		case '}':
 		{
-			++m_position;
 			return std::make_unique<token>(close_brace_token());
 		}
 		case '[':
 		{
-			++m_position;
 			return std::make_unique<token>(open_bracket_token());
 		}
 		case ']':
 		{
-			++m_position;
 			return std::make_unique<token>(close_bracket_token());
 		}
 		case ',':
 		{
-			++m_position;
 			return std::make_unique<token>(comma_token());
 		}
 		case ':':
 		{
-			m_position++;
 			return std::make_unique<token>(colon_token());
 		}
 		case '"':
 		{
 			auto res = read_string_literal();
 			if (!res)
-			{
-				m_position = position;
-				shrink();
-			}
+				m_buffer.pubseekpos(pos, std::ios_base::in);
 			return res;
 		}
 		case '-':
@@ -330,87 +337,84 @@ std::unique_ptr<token> tokenizer::next()
 		case '8':
 		case '9':
 		{
-			auto res = read_numeric_literal();
+			auto res = read_numeric_literal(c);
 			if (!res)
-			{
-				m_position = position;
-				shrink();
-			}
+				m_buffer.pubseekpos(pos, std::ios_base::in);
 			return res;
 		}
 		case 'f':
-			if (m_position++ != m_buffer.size() && m_buffer[m_position] == 'a'
-				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'l'
-				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 's'
-				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'e'
-				&& (m_position++ == m_buffer.size() || !isalnum(m_buffer[m_position], m_locale)))
+		{
+			if ((c = m_buffer.snextc()) == 'a'
+				&& (c = m_buffer.snextc()) == 'l'
+				&& (c = m_buffer.snextc()) == 's'
+				&& (c = m_buffer.snextc()) == 'e'
+				&& (!isalnum((c = m_buffer.snextc()), m_locale)))
 			{
 				return std::make_unique<token>(false_token());
 			}
 			else
 			{
-				if (m_position == m_buffer.size())
+				if (c == EOF)
 				{
-					m_position = position;
-					shrink();
+					m_buffer.pubseekpos(pos, std::ios_base::in);
 					return nullptr;
 				}
 				else
 				{
-					m_position = position; /* to stay in a valid state */
-					throw corecpp::syntax_error(reminder());
+					m_buffer.pubseekpos(pos, std::ios_base::in);
+					corecpp::throws<corecpp::syntax_error>(reminder());
 				}
 			}
+		}
 		case 'n':
-			if(m_position++ != m_buffer.size() && m_buffer[m_position] == 'u'
-				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'l'
-				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'l'
-				&& (m_position++ == m_buffer.size() || !isalnum(m_buffer[m_position], m_locale)))
+			if ((c = m_buffer.snextc()) == 'u'
+				&& (c = m_buffer.snextc()) == 'l'
+				&& (c = m_buffer.snextc()) == 'l'
+				&& (!isalnum((c = m_buffer.snextc()), m_locale)))
 			{
 				return std::make_unique<token>(null_token());
 			}
 			else
 			{
-				if (m_position == m_buffer.size())
+				if (c == EOF)
 				{
-					m_position = position;
-					shrink();
+					m_buffer.pubseekpos(pos, std::ios_base::in);
 					return nullptr;
 				}
 				else
 				{
-					m_position = position; /* to stay in a valid state */
-					throw corecpp::syntax_error(reminder());
+					m_buffer.pubseekpos(pos, std::ios_base::in);
+					corecpp::throws<corecpp::syntax_error>(reminder());
 				}
 			}
 
 		case 't':
-			if(m_position++ != m_buffer.size() && m_buffer[m_position] == 'r'
-				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'u'
-				&& m_position++ != m_buffer.size() && m_buffer[m_position] == 'e'
-				&& (m_position++ == m_buffer.size() || !isalnum(m_buffer[m_position], m_locale)))
+			if ((c = m_buffer.snextc()) == 'r'
+				&& (c = m_buffer.snextc()) == 'u'
+				&& (c = m_buffer.snextc()) == 'e'
+				&& (!isalnum((c = m_buffer.snextc()), m_locale)))
 			{
 				return std::make_unique<token>(false_token());
 			}
 			else
 			{
-				if (m_position == m_buffer.size())
+				if (c == EOF)
 				{
-					m_position = position;
-					shrink();
+					m_buffer.pubseekpos(pos, std::ios_base::in);
 					return nullptr;
 				}
 				else
 				{
-					m_position = position; /* to stay in a valid state */
-					throw corecpp::syntax_error(reminder());
+					m_buffer.pubseekpos(pos, std::ios_base::in);
+					corecpp::throws<corecpp::syntax_error>(reminder());
 				}
 			}
 		default:
-			m_position = position;
+			m_buffer.pubseekpos(pos, std::ios_base::in);
 			return nullptr;
 	}
 }
+
 /*
  * NODES
  */
@@ -421,7 +425,7 @@ value_node& object_node::at (const std::wstring& key)
 		if (value.name.value == key)
 			return value.value;
 	}
-	throw std::overflow_error(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
+	corecpp::throws<std::overflow_error>(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
 }
 const value_node& object_node::at (const std::wstring& key) const
 {
@@ -430,7 +434,7 @@ const value_node& object_node::at (const std::wstring& key) const
 		if (value.name.value == key)
 			return value.value;
 	}
-	throw std::overflow_error(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
+	corecpp::throws<std::overflow_error>(std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(key));
 }
 
 /*
@@ -483,7 +487,7 @@ shift_result object_rule::shift(node&& n)
 node object_rule::reduce()
 {
 	if (m_status != status::end)
-		throw syntax_error("close_brace_token expected");
+		corecpp::throws<syntax_error>("close_brace_token expected");
 	return object_node { std::move(m_members) };
 }
 
@@ -560,7 +564,7 @@ shift_result array_rule::shift(node&& n)
 node array_rule::reduce()
 {
 	if (m_status != status::end)
-		throw syntax_error("close_brace_token expected");
+		corecpp::throws<syntax_error>("close_brace_token expected");
 	return array_node { std::move(m_values) };
 }
 
@@ -637,7 +641,7 @@ node pair_rule::reduce()
 		case status::start:
 		case status::name:
 		case status::colon:
-			throw corecpp::syntax_error(corecpp::concat<std::string>({ __func__," called when in state ", std::to_string((int)m_status)}));
+			corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ __func__," called when in state ", std::to_string((int)m_status)}));
 		case status::value:
 		default:
 			return pair_node { { m_name }, std::move(m_value.get<value_node>()) };
@@ -701,7 +705,7 @@ shift_result value_rule::shift(node&& n)
 node value_rule::reduce()
 {
 	if (m_value.index() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
-		throw corecpp::syntax_error(corecpp::concat<std::string>({ __func__," called when no value" }));
+		corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ __func__," called when no value" }));
 	return m_value.get<value_node>().visit([](auto& value) -> node { return { std::move(value) }; });
 }
 
@@ -716,10 +720,10 @@ void parser::push(token&& tk)
 			node n = m_stack.back().visit([](auto& r) -> node { return r.reduce(); });
 			m_stack.pop_back();
 			if (m_stack.empty())
-				throw corecpp::syntax_error(corecpp::concat<std::string>({ __func__," unexpected token : ", to_string(tk)}));
+				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ __func__," unexpected token : ", to_string(tk)}));
 			pushed = m_stack.back().visit([&n](auto& r) -> shift_result { return r.shift(std::move(n)); });
 			if (!pushed.eaten)
-				throw corecpp::syntax_error(corecpp::concat<std::string>({ __func__," unexpected token : ", to_string(tk)}));
+				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ __func__," unexpected token : ", to_string(tk)}));
 			if (pushed.next_rule.index() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
 				m_stack.emplace_back(std::move(pushed.next_rule.get<rule>()));
 			pushed = m_stack.back().visit([&tk](auto& r) -> shift_result { return r.shift(std::move(tk)); });
@@ -744,7 +748,7 @@ node parser::end(void)
 			return n;
 		auto pushed = m_stack.back().visit([&n](auto& r) -> shift_result { return r.shift(std::move(n)); });
 		if (!pushed.eaten)
-			throw corecpp::syntax_error(corecpp::concat<std::string>({ __func__," unable to reduce node"}));
+			corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ __func__," unable to reduce node"}));
 		if (pushed.next_rule.index() == corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
 			m_stack.emplace_back(std::move(pushed.next_rule.get<rule>()));
 	}
@@ -797,7 +801,7 @@ void serializer::convert_and_escape(const std::wstring& value)
 			m_stream << (c & 0x3F) + 0x80;
 		}
 		else
-			throw std::range_error(corecpp::concat<std::string>({ "Unable to convert charcode ", std::to_string((uint32_t)c) }));
+			corecpp::throws<std::range_error>(corecpp::concat<std::string>({ "Unable to convert charcode ", std::to_string((uint32_t)c) }));
 	}
 }
 
@@ -826,7 +830,7 @@ void serializer::convert_and_escape(const std::u16string& value)
 			m_stream << (c & 0x3F) + 0x80;
 		}
 		else
-			throw std::range_error(corecpp::concat<std::string>({ "Unable to convert charcode ", std::to_string((uint32_t)c) }));
+			corecpp::throws<std::range_error>(corecpp::concat<std::string>({ "Unable to convert charcode ", std::to_string((uint32_t)c) }));
 	}
 }
 
@@ -862,7 +866,7 @@ void serializer::convert_and_escape(const std::u32string& value)
 			m_stream << (c & 0x3F) + 0x80;
 		}
 		else
-			throw std::range_error(corecpp::concat<std::string>({ "Unable to convert charcode ", std::to_string((uint32_t)c) }));
+			corecpp::throws<std::range_error>(corecpp::concat<std::string>({ "Unable to convert charcode ", std::to_string((uint32_t)c) }));
 	}
 }
 
@@ -873,7 +877,7 @@ void deserializer::read_string(const string_token& wstr, std::string& value)
 	std::mbstate_t state = std::mbstate_t();
 	auto len = std::wcsrtombs(nullptr, &wchar, 0, &state);
 	if (len == static_cast<std::size_t>(-1))
-		throw std::runtime_error("converion error");
+		corecpp::throws<std::runtime_error>("converion error");
 	value.resize(len);
 	std::wcsrtombs((char*)value.data(), &wchar, len, &state);
 }
@@ -908,26 +912,11 @@ token deserializer::read()
 		json_logger().trace("read token", to_string(*token), __FILE__, __LINE__);
 		return std::move(*token);
 	}
-	// 2nd try, read available data
-	auto available = m_stream.rdbuf()->in_avail();
-	std::string buffer;
-	buffer.resize(available);
-	m_stream.read((char*)buffer.data(), available);
-	m_tokenizer.eat(buffer);
-	token = m_tokenizer.next();
-	if (token)
-	{
-		json_logger().trace("read token", to_string(*token), __FILE__, __LINE__);
-		return std::move(*token);
-	}
-	// 3rd try, read by block
 	do
 	{
 		if (m_stream.eof())
-			throw std::runtime_error("eof reached unexpectedly");
-		buffer.resize(1024);
-		m_stream.read((char*)buffer.data(), 1024);
-		m_tokenizer.eat(buffer);
+			corecpp::throws<std::runtime_error>("eof reached unexpectedly");
+		m_stream.peek(); /* does this block until next caracters are available?  */
 		token = m_tokenizer.next();
 	}
 	while (!token);

@@ -8,11 +8,10 @@
 #include <locale>
 #include <codecvt>
 
-#include "../meta/extensions.h"
+#include <corecpp/meta/extensions.h>
 
 namespace corecpp
 {
-
 	template<typename T, typename SerializerT, typename Enable = void>
 	struct is_serializable
 	{
@@ -270,36 +269,6 @@ namespace corecpp
 		}
 	};
 	*/
-
-	struct lexical_error : std::invalid_argument
-	{
-		lexical_error(const char* message)
-		: invalid_argument(message)
-		{}
-		lexical_error(const std::string& message)
-		: invalid_argument(message)
-		{}
-	};
-
-	struct syntax_error : std::invalid_argument
-	{
-		syntax_error(const char* message)
-		: invalid_argument(message)
-		{}
-		syntax_error(const std::string& message)
-		: invalid_argument(message)
-		{}
-	};
-
-	struct semantic_error : std::invalid_argument
-	{
-		semantic_error(const char* message)
-		: invalid_argument(message)
-		{}
-		semantic_error(const std::string& message)
-		: invalid_argument(message)
-		{}
-	};
 }
 
 #endif

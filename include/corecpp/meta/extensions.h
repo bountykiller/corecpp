@@ -167,6 +167,16 @@ struct is_time_point<T,
 template<typename T>
 inline constexpr bool is_time_point_v = is_time_point<T>::value;
 
+
+struct null_function
+{
+	template <typename... ArgsT>
+	void operator ()([[maybe_unused]] ArgsT ...args)
+	{
+		return;
+	}
+};
+
 }
 
 

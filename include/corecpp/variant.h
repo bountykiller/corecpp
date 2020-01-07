@@ -38,8 +38,8 @@ namespace
 	};
 }
 
-/*
- * !\brief class intented to implement the variant concept
+/*!
+ * \brief class intented to implement the variant concept
  * NOTE: While this class tend to use some of the stl vocabulary, it is not stl-compliant
  */
 template<typename... TArgs>

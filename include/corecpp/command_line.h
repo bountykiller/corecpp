@@ -42,6 +42,8 @@ namespace corecpp
 			* \retval true if the reader expects the value to never be an empty string
 			* \retval false if the reader accept the value to be an empty string
 			*/
+		virtual ~option_reader()
+		{}
 		virtual bool require_value() const = 0;
 		virtual void read(const std::string& arg_value) const = 0;
 	};
@@ -330,7 +332,7 @@ namespace corecpp
 		command_line_parser(command_line_parser&&) = default;
 		command_line_parser(const command_line_parser&) = delete; /* options can't be copied anyway */
 		command_line_parser& operator = (command_line_parser&) = delete;
-		command_line_parser& operator = (command_line_parser&&) = default;
+		command_line_parser& operator = (command_line_parser&& other)  = delete;
 
 		template <typename T>
 		void add_option(char shortname, const std::string& name, const std::string& helpmsg, T&& value)
@@ -393,6 +395,10 @@ namespace corecpp
 
 		void usage();
 		void parse_options(void);
+		/*!
+		 *\brief Will execute the command given on the command line.
+		 *\return The result of the command. If no command was specified, it returns -1
+		 */
 		int execute();
 		void parse_parameters(void);
 	};

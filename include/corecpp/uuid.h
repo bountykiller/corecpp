@@ -25,9 +25,9 @@ class uuid final
 public:
 	static const uuid nil;
 
-	uuid(const std::array<uint8_t, 16>& data) noexcept : m_data { data }
+	uuid(unsigned __int128 data = 0) noexcept : m_data { .long_128 = data }
 	{}
-	uuid(unsigned __int128 data) noexcept : m_data { .long_128 = data }
+	uuid(const std::array<uint8_t, 16>& data) noexcept : m_data { data }
 	{}
 	uuid(const uuid& other) noexcept : m_data(other.m_data)
 	{}
