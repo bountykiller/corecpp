@@ -69,9 +69,9 @@ namespace corecpp
 		{};
 
 		using token = corecpp::variant<open_brace_token, close_brace_token, open_bracket_token, close_bracket_token,
-		comma_token, dot_token, colon_token,
-		string_token, numeric_token, integral_token,
-		null_token, true_token, false_token>;
+			comma_token, dot_token, colon_token,
+			string_token, numeric_token, integral_token,
+			null_token, true_token, false_token>;
 
 		std::string to_string(const token& tk);
 
@@ -239,14 +239,14 @@ namespace corecpp
 			};
 			status m_status;
 			std::wstring m_name;
-			corecpp::variant<std::nullptr_t, value_node> m_value;
+			std::optional<value_node> m_value;
 		public:
-			pair_rule(pair_rule&& other)
-			: m_status(other.m_status), m_name(std::move(other.m_name)), m_value(std::move(other.m_value))
+			pair_rule()
+			: m_status(status::start), m_name(), m_value()
 			{
 			}
-			pair_rule()
-			: m_status(status::start), m_name(), m_value(nullptr)
+			pair_rule(pair_rule&& other)
+			: m_status(other.m_status), m_name(std::move(other.m_name)), m_value(std::move(other.m_value))
 			{
 			}
 			shift_result shift(token&& n);

@@ -344,10 +344,10 @@ std::unique_ptr<token> tokenizer::next()
 		}
 		case 'f':
 		{
-			if ((c = m_buffer.snextc()) == 'a'
-				&& (c = m_buffer.snextc()) == 'l'
-				&& (c = m_buffer.snextc()) == 's'
-				&& (c = m_buffer.snextc()) == 'e'
+			if ((c = m_buffer.sbumpc()) == 'a'
+				&& (c = m_buffer.sbumpc()) == 'l'
+				&& (c = m_buffer.sbumpc()) == 's'
+				&& (c = m_buffer.sbumpc()) == 'e'
 				&& (!isalnum((c = m_buffer.snextc()), m_locale)))
 			{
 				return std::make_unique<token>(false_token());
@@ -367,9 +367,9 @@ std::unique_ptr<token> tokenizer::next()
 			}
 		}
 		case 'n':
-			if ((c = m_buffer.snextc()) == 'u'
-				&& (c = m_buffer.snextc()) == 'l'
-				&& (c = m_buffer.snextc()) == 'l'
+			if ((c = m_buffer.sbumpc()) == 'u'
+				&& (c = m_buffer.sbumpc()) == 'l'
+				&& (c = m_buffer.sbumpc()) == 'l'
 				&& (!isalnum((c = m_buffer.snextc()), m_locale)))
 			{
 				return std::make_unique<token>(null_token());
@@ -389,12 +389,12 @@ std::unique_ptr<token> tokenizer::next()
 			}
 
 		case 't':
-			if ((c = m_buffer.snextc()) == 'r'
-				&& (c = m_buffer.snextc()) == 'u'
-				&& (c = m_buffer.snextc()) == 'e'
+			if ((c = m_buffer.sbumpc()) == 'r'
+				&& (c = m_buffer.sbumpc()) == 'u'
+				&& (c = m_buffer.sbumpc()) == 'e'
 				&& (!isalnum((c = m_buffer.snextc()), m_locale)))
 			{
-				return std::make_unique<token>(false_token());
+				return std::make_unique<token>(true_token());
 			}
 			else
 			{
@@ -644,7 +644,7 @@ node pair_rule::reduce()
 			corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ __func__," called when in state ", std::to_string((int)m_status)}));
 		case status::value:
 		default:
-			return pair_node { { m_name }, std::move(m_value.get<value_node>()) };
+			return pair_node { { m_name }, std::move(m_value.value()) };
 	}
 }
 
@@ -742,7 +742,7 @@ node parser::end(void)
 {
 	for(;;)
 	{
-		node n = m_stack.back().visit([](auto& r) -> node { return r.reduce(); });
+		node n = m_stack.back().visit([](auto& r) { return r.reduce(); });
 		m_stack.pop_back();
 		if (m_stack.empty())
 			return n;

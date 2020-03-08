@@ -1,6 +1,8 @@
 #ifndef CORE_CPP_ITERATOR_H
 #define CORE_CPP_ITERATOR_H
 
+#include <type_traits>
+
 
 namespace corecpp
 {
