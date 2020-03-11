@@ -348,7 +348,7 @@ std::unique_ptr<token> tokenizer::next()
 				&& (c = m_buffer.sbumpc()) == 'l'
 				&& (c = m_buffer.sbumpc()) == 's'
 				&& (c = m_buffer.sbumpc()) == 'e'
-				&& (!isalnum((c = m_buffer.snextc()), m_locale)))
+				&& (!isalnum((c = m_buffer.sgetc()), m_locale)))
 			{
 				return std::make_unique<token>(false_token());
 			}
@@ -370,7 +370,7 @@ std::unique_ptr<token> tokenizer::next()
 			if ((c = m_buffer.sbumpc()) == 'u'
 				&& (c = m_buffer.sbumpc()) == 'l'
 				&& (c = m_buffer.sbumpc()) == 'l'
-				&& (!isalnum((c = m_buffer.snextc()), m_locale)))
+				&& (!isalnum((c = m_buffer.sgetc()), m_locale)))
 			{
 				return std::make_unique<token>(null_token());
 			}
@@ -392,7 +392,7 @@ std::unique_ptr<token> tokenizer::next()
 			if ((c = m_buffer.sbumpc()) == 'r'
 				&& (c = m_buffer.sbumpc()) == 'u'
 				&& (c = m_buffer.sbumpc()) == 'e'
-				&& (!isalnum((c = m_buffer.snextc()), m_locale)))
+				&& (!isalnum((c = m_buffer.sgetc()), m_locale)))
 			{
 				return std::make_unique<token>(true_token());
 			}
@@ -761,7 +761,11 @@ void serializer::convert_and_escape(const std::string& value)
 	for(unsigned char c : value)
 	{
 		if (std::isprint((char)c))
-			m_stream << c;
+		{
+			if ( (char)c == '\\' || (char)c == '\"' )
+				m_stream << '\\';
+			m_stream << (char)c;
+		}
 		else if (c < 0x10)
 			m_stream << "\\u000" << hex_chars[c & 0x0F];
 		else
@@ -777,7 +781,11 @@ void serializer::convert_and_escape(const std::wstring& value)
 	for (wchar_t c : value)
 	{
 		if (std::isprint((char)c))
+		{
+			if ( (char)c == '\\' || (char)c == '\"' )
+				m_stream << '\\';
 			m_stream << (char)c;
+		}
 		else if (c < 0x10)
 			m_stream << "\\u000" << hex_chars[c & 0x0F];
 		else if (c < 0x100)
@@ -813,7 +821,11 @@ void serializer::convert_and_escape(const std::u16string& value)
 	for (char16_t c : value)
 	{
 		if (std::isprint((char)c))
+		{
+			if ( (char)c == '\\' || (char)c == '\"' )
+				m_stream << '\\';
 			m_stream << (char)c;
+		}
 		else if (c < 0x10)
 			m_stream << "\\u000" << hex_chars[c & 0x0F];
 		else if (c < 0x100)
@@ -842,7 +854,11 @@ void serializer::convert_and_escape(const std::u32string& value)
 	for (char32_t c : value)
 	{
 		if (std::isprint((char)c))
+		{
+			if ( (char)c == '\\' || (char)c == '\"' )
+				m_stream << '\\';
 			m_stream << (char)c;
+		}
 		else if (c < 0x10)
 			m_stream << "\\u000" << hex_chars[c & 0x0F];
 		else if (c < 0x100)
@@ -903,14 +919,15 @@ void deserializer::read_string(const string_token& wstr, std::u32string& value)
 }
 
 
-token deserializer::read()
+void deserializer::read()
 {
 	// 1st try, no read
 	auto token = m_tokenizer.next();
 	if (token)
 	{
 		json_logger().trace("read token", to_string(*token), __FILE__, __LINE__);
-		return std::move(*token);
+		m_current = std::move(*token);
+		return;
 	}
 	do
 	{
@@ -921,7 +938,7 @@ token deserializer::read()
 	}
 	while (!token);
 	json_logger().trace("read token", to_string(*token), __FILE__, __LINE__);
-	return std::move(*token);
+	m_current = std::move(*token);
 }
 
 }

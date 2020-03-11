@@ -1,6 +1,7 @@
 #ifndef CORE_CPP_UNITTEST_H
 #define CORE_CPP_UNITTEST_H
 
+#include <algorithm>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -44,6 +45,38 @@ namespace corecpp
 			{
 				oss << "      - " << err << "\n";
 			}
+		}
+
+		test_case_result operator + (test_case_result&& other) const
+		{
+			test_case_result res;
+			std::copy(errors.begin(), errors.end(), std::back_inserter(res.errors));
+			std::move(other.errors.begin(), other.errors.end(), std::back_inserter(res.errors));
+			res.value = std::max(value, other.value);
+			return res;
+		}
+
+		test_case_result operator + (const test_case_result& other) const
+		{
+			test_case_result res;
+			std::copy(errors.begin(), errors.end(), std::back_inserter(res.errors));
+			std::copy(other.errors.begin(), other.errors.end(), std::back_inserter(res.errors));
+			res.value = std::max(value, other.value);
+			return res;
+		}
+
+		test_case_result& operator += (test_case_result&& other)
+		{
+			std::move(other.errors.begin(), other.errors.end(), std::back_inserter(errors));
+			value = std::max(value, other.value);
+			return *this;
+		}
+
+		test_case_result& operator += (const test_case_result& other)
+		{
+			std::copy(other.errors.begin(), other.errors.end(), std::back_inserter(errors));
+			value = std::max(value, other.value);
+			return *this;
 		}
 	};
 
@@ -305,6 +338,7 @@ namespace corecpp
 					return run_fixture(f.first, *f.second);
 				});
 			}
+			parser.parse_options();
 			int res = parser.execute();
 			if (res <= 0)
 			{
