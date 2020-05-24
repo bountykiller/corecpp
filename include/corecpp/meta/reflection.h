@@ -125,6 +125,8 @@ struct type_index
 {
 	static constexpr size_t value = variadic<TArgs...>::template index_of<T>::value;
 };
+template<typename T, typename... TArgs>
+inline constexpr std::size_t type_index_v = type_index<T, TArgs...>::value;
 
 template<size_t index, typename... TArgs>
 struct type_at

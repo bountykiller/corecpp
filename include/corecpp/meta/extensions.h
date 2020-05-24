@@ -168,6 +168,28 @@ template<typename T>
 inline constexpr bool is_time_point_v = is_time_point<T>::value;
 
 
+
+
+template <template<typename T> typename CondT, typename HeadT, typename... TailT>
+struct all_type;
+
+template <template<typename T> typename CondT, typename HeadT>
+struct all_type<CondT, HeadT>
+{
+	static constexpr bool value = CondT<HeadT>::value;
+};
+
+template <template<typename T> typename CondT, typename HeadT, typename... TailT>
+struct all_type
+{
+	static constexpr bool value = CondT<HeadT>::value && all_type<CondT, TailT...>::value;
+};
+
+template<template<typename T> typename CondT, typename HeadT, typename... TailT>
+inline constexpr bool all_type_v = all_type<CondT, HeadT, TailT...>::value;
+
+
+
 struct null_function
 {
 	template <typename... ArgsT>

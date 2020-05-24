@@ -182,8 +182,8 @@ class channel final
 	mutable std::mutex m_mutex;
 	static void diagnose(event message, params& parameters);
 	channel() = default;
-	channel(const channel&) = default;//at least for now
-	channel& operator=(const channel&) = default;
+	channel(const channel&) = delete;
+	channel& operator=(const channel&) = delete;
 public:
 	channel(channel&& other)
 	: m_params(std::move(other.m_params))

@@ -18,6 +18,9 @@ class mailaddress final
 	std::string_view m_local_part;
 	std::string_view m_domain;
 
+
+	void parse();
+
 public:
 	static const auto& properties()
 	{
@@ -44,7 +47,7 @@ public:
 	explicit mailaddress(std::string s)
 	: m_value { std::move(s) }
 	{
-		/* TODO : parse the given string */
+		parse();
 	}
 
 	mailaddress& operator = (const mailaddress& other)

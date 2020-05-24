@@ -23,7 +23,7 @@ public:
 	using const_pointer = typename std::add_const<pointer>::type;
 
 private:
-	pointer m_ptr;
+	pointer m_ptr = nullptr;
 
 public:
 	ref_ptr() = default;
@@ -39,7 +39,7 @@ public:
 	reference_type operator* () const
 	{
 #if DEBUG
-		if(m_ptr)
+		if (m_ptr)
 			return *m_ptr;
 		else
 			throw std::logic_error("trying to dereference a null pointer");

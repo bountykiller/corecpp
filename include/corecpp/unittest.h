@@ -117,7 +117,7 @@ namespace corecpp
 				std::ostringstream oss;
 				if (m_result < test_result::FAILURE)
 					m_result = test_result::FAILURE;
-				oss << "Error at test " << m_current_test_index <<  ": " << "actual: " << actual << "\texpected:" << expected;
+				oss << "Error at index " << m_current_test_index <<  ": " << "actual: " << actual << "\texpected:" << expected;
 				m_errors.emplace_back(oss.str());
 			}
 		}
@@ -132,7 +132,7 @@ namespace corecpp
 				std::ostringstream oss;
 				if (m_result < test_result::FATAL)
 					m_result = test_result::FATAL;
-				oss << "Fatal at test " << m_current_test_index <<  ": " <<"actual: " << actual << "\texpected:" << expected;
+				oss << "Fatal at index " << m_current_test_index <<  ": " <<"actual: " << actual << "\texpected:" << expected;
 				m_errors.emplace_back(oss.str());
 				corecpp::throws<assertion_error>(oss.str());
 			}

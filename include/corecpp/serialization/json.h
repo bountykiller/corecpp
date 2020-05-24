@@ -168,10 +168,12 @@ namespace corecpp
 		: public corecpp::variant<object_node, array_node, string_node,
 			integral_node, numeric_node, char_node, boolean_node, null_node>
 		{
+			using parent_type = corecpp::variant<object_node, array_node, string_node,
+				integral_node, numeric_node, char_node, boolean_node, null_node>;
 			template <typename T>
 			value_node(T&& value)
-			: corecpp::variant<object_node, array_node, string_node,
-				integral_node, numeric_node, char_node, boolean_node, null_node>(std::forward<T>(value))
+			noexcept(std::is_nothrow_constructible<parent_type, T&&>::value)
+			: parent_type(std::forward<T>(value))
 			{
 			}
 		};
@@ -218,12 +220,13 @@ namespace corecpp
 			status m_status;
 			std::vector<pair_node> m_members;
 		public:
-			object_rule()
+			object_rule() noexcept
 			: m_status(status::start), m_members()
 			{}
-			object_rule(object_rule&& other)
+			object_rule(object_rule&& other) noexcept
 			: m_status(other.m_status), m_members(std::move(other.m_members))
 			{}
+			object_rule(const object_rule&) = delete;
 			shift_result shift(token&& tk);
 			shift_result shift(node&& n);
 			node reduce();
@@ -241,14 +244,15 @@ namespace corecpp
 			std::wstring m_name;
 			std::optional<value_node> m_value;
 		public:
-			pair_rule()
+			pair_rule() noexcept
 			: m_status(status::start), m_name(), m_value()
 			{
 			}
-			pair_rule(pair_rule&& other)
+			pair_rule(pair_rule&& other) noexcept
 			: m_status(other.m_status), m_name(std::move(other.m_name)), m_value(std::move(other.m_value))
 			{
 			}
+			pair_rule(const pair_rule& other) = delete;
 			shift_result shift(token&& n);
 			shift_result shift(node&& n);
 			node reduce();
@@ -272,10 +276,11 @@ namespace corecpp
 		{
 			corecpp::variant<std::nullptr_t, value_node> m_value;
 		public:
-			value_rule() : m_value(nullptr)
+			value_rule() noexcept : m_value(nullptr)
 			{}
-			value_rule(value_rule&& other) : m_value(std::move(other.m_value))
+			value_rule(value_rule&& other) noexcept : m_value(std::move(other.m_value))
 			{}
+			value_rule(const value_rule& other) = delete;
 			shift_result shift(token&& n);
 			shift_result shift(node&& n);
 			node reduce();

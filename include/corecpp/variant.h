@@ -5,6 +5,7 @@
 #include <utility>
 #include <cassert>
 #include <corecpp/meta/reflection.h>
+#include <corecpp/meta/extensions.h>
 #include <corecpp/any.h>
 
 namespace corecpp
@@ -41,6 +42,7 @@ namespace
 /*!
  * \brief class intented to implement the variant concept
  * NOTE: While this class tend to use some of the stl vocabulary, it is not stl-compliant
+ * Unlike stl-variant, this class should support references types (though some operations like copies don't work woth them)
  */
 template<typename... TArgs>
 class variant
@@ -52,20 +54,34 @@ public:
 	template<typename T>
 	struct index_of
 	{
-		static constexpr uint value = corecpp::type_index<T, TArgs...>::value;
+		static inline constexpr uint value = corecpp::type_index<T, TArgs...>::value;
 	};
+	template<typename T>
+	static inline constexpr uint index_of_v = index_of<T>::value;
+
 	template<size_t index>
 	struct type_at
 	{
 		using type = typename corecpp::type_at<index, TArgs...>::type;
 	};
+	template<size_t index> using type_at_t = typename type_at<index>::type;
 
-	variant() noexcept(std::is_nothrow_default_constructible<typename type_at<0>::type>::value)
+	/* TODO */
+	static inline bool has_reference = corecpp::all_type<std::is_reference, TArgs...>::value;
+	static inline constexpr bool is_move_constructible = corecpp::all_type<std::is_move_constructible, TArgs...>::value;
+	static inline constexpr bool is_nothrow_move_constructible = corecpp::all_type<std::is_nothrow_move_constructible, TArgs...>::value;
+	static inline constexpr bool is_copy_constructible = corecpp::all_type<std::is_copy_constructible, TArgs...>::value;
+	static inline constexpr bool is_nothrow_copy_constructible = corecpp::all_type<std::is_nothrow_copy_constructible, TArgs...>::value;
+
+
+	variant() noexcept(std::is_nothrow_default_constructible_v<type_at_t<0>>)
 	: m_type_index(0)
 	{
-		new(&m_data) typename type_at<0>::type;
+		new(&m_data) type_at_t<0>;
 	}
-	variant(variant&& other) noexcept
+	//variant(std::enable_if_t<std::is_move_constructible_v<type_at_t<0>>, variant>&& other)
+	variant(variant&& other)
+	noexcept(is_nothrow_move_constructible)
 	: m_type_index(other.m_type_index)
 	{
 		visit([&other](auto& value) {
@@ -73,7 +89,9 @@ public:
 			new (&value) ValueT(std::move(other.template get<ValueT>()));
 		});
 	}
-	variant(const variant& other) noexcept(std::is_nothrow_copy_constructible<typename type_at<0>::type>::value)
+	//variant(const std::enable_if_t<std::is_copy_constructible_v<type_at_t<0>>, variant>& other)
+	variant(const variant& other)
+	noexcept(std::is_nothrow_copy_constructible<type_at_t<0>>::value)
 	: m_type_index(other.m_type_index)
 	{
 		visit([&other](auto& value) {
@@ -161,7 +179,7 @@ public:
 	T& get()
 	{
 		assert(m_type_index == index_of<T>::value);
-		return *(reinterpret_cast<T*>(m_data));
+		return reinterpret_cast<T&>(*(reinterpret_cast<char*>(m_data)));
 	}
 
 	template<typename T>

@@ -31,9 +31,9 @@ int mul(corecpp::command_line& line)
 	corecpp::command_line_parser multiplication(line);
 	multiplication.add_option({ 'h', "help", "show help message", show_help });
 	multiplication.add_params(
-			corecpp::program_parameter { "a", "first number", a, },
-			corecpp::program_parameter { "b", "second number", b },
-			corecpp::program_parameter { "c", "third number", c, true }
+		corecpp::program_parameter { "a", "first number", a, },
+		corecpp::program_parameter { "b", "second number", b },
+		corecpp::program_parameter { "c", "third number", c, true }
 	);
 
 	multiplication.parse_options();
