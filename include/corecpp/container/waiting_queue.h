@@ -58,6 +58,23 @@ namespace corecpp
 			}
 			template<typename T,
 					typename = typename std::enable_if<std::is_move_assignable<T>::value, T>::type>
+			void pop(T& out)
+			{
+				std::unique_lock<std::mutex> lock(m_mutex);
+				m_condition.wait(lock, [&] { return !m_container.empty(); });
+				out = std::move(m_container.front());
+				m_container.pop_front();
+			}
+			template<typename T>
+			void pop(typename std::enable_if<std::is_copy_assignable<T>::value, T>::type& out)
+			{
+				std::unique_lock<std::mutex> lock(m_mutex);
+				m_condition.wait(lock, [&] { return !m_container.empty(); });
+				out = m_container.front();
+				m_container.pop_front();
+			}
+			template<typename T,
+					typename = typename std::enable_if<std::is_move_assignable<T>::value, T>::type>
 			bool try_pop(T& out)
 			{
 				std::unique_lock<std::mutex> lock(m_mutex);

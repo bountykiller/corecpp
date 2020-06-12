@@ -143,7 +143,8 @@ class async_appender : public appender
 
 	void run()
 	{
-		while (std::unique_ptr<event> ev = m_queue.pop())
+		std::unique_ptr<event> ev;
+		for (m_queue.pop(ev); ev; m_queue.pop(ev))
 		{
 			m_appender.append(ev);
 		}

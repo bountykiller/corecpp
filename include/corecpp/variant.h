@@ -79,7 +79,7 @@ public:
 	{
 		new(&m_data) type_at_t<0>;
 	}
-	//variant(std::enable_if_t<std::is_move_constructible_v<type_at_t<0>>, variant>&& other)
+	//variant(std::enable_if_t<is_move_constructible, variant&&> other)
 	variant(variant&& other)
 	noexcept(is_nothrow_move_constructible)
 	: m_type_index(other.m_type_index)
@@ -89,9 +89,9 @@ public:
 			new (&value) ValueT(std::move(other.template get<ValueT>()));
 		});
 	}
-	//variant(const std::enable_if_t<std::is_copy_constructible_v<type_at_t<0>>, variant>& other)
+	//variant(std::enable_if_t<is_copy_constructible, const variant&> other)
 	variant(const variant& other)
-	noexcept(std::is_nothrow_copy_constructible<type_at_t<0>>::value)
+	noexcept(is_nothrow_copy_constructible)
 	: m_type_index(other.m_type_index)
 	{
 		visit([&other](auto& value) {
