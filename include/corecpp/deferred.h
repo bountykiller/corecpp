@@ -29,15 +29,17 @@ namespace corecpp
 		deferred(deferred&&) = default;
 		value_type& operator*()
 		{
-			if(m_data.index() == 0)
-				evaluate();
-			return m_data.template get<value_type>();
+			return value();
 		}
 		value_type* operator->()
 		{
-			if(m_data.index() == 0)
+			return &value();
+		}
+		value_type& value()
+		{
+			if (m_data.index() == 0)
 				evaluate();
-			return &m_data.template get<value_type>();
+			return m_data.template get<value_type>();
 		}
 		void reset(void)
 		{

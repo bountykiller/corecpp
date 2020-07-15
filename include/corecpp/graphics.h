@@ -113,10 +113,8 @@ struct graphic_rendition
 template <sgr_p param>
 const std::string graphic_rendition<param>::value = std::string("\x1b[") + to_char(param) + "m";
 
-#if defined __cplusplus && __cplusplus > 201103L
 template <sgr_p param>
 const std::string graphic_rendition_v = graphic_rendition<param>::value;
-#endif
 
 }
 

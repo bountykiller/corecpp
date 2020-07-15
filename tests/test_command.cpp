@@ -121,10 +121,37 @@ public:
 	}
 };
 
+class test_parser final : public test_fixture
+{
+	test_case_result test_params() const
+	{
+		struct test {
+			int argc;
+			char** argv;
+			bool match;
+			int expected;
+		};
+		test_cases<test> tests ({
+		});
+
+		return run(tests, [&](const test& t){
+			/* TODO */
+		});
+	}
+public:
+	tests_type tests() const override
+	{
+		return {
+			{ "test_params", [&] () { return test_params(); } },
+		};
+	}
+};
+
 int main(int argc, char** argv)
 {
 	test_unit unit { "command line" };
 	unit.add_fixture<test_option>("test_option");
+	unit.add_fixture<test_parser>("test_parser");
 
 	return unit.run(argc, argv);
 };

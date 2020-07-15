@@ -1,12 +1,18 @@
 #ifndef VARIANT_H
 #define VARIANT_H
 
+#include <memory>
 #include <type_traits>
 #include <utility>
-#include <cassert>
+
+#include <corecpp/algorithm.h>
+#include <corecpp/any.h>
+#include <corecpp/except.h>
 #include <corecpp/meta/reflection.h>
 #include <corecpp/meta/extensions.h>
-#include <corecpp/any.h>
+
+/* compiler-dependent stuff */
+#include <cxxabi.h>
 
 namespace corecpp
 {
@@ -73,17 +79,21 @@ public:
 	static inline constexpr bool is_copy_constructible = corecpp::all_type<std::is_copy_constructible, TArgs...>::value;
 	static inline constexpr bool is_nothrow_copy_constructible = corecpp::all_type<std::is_nothrow_copy_constructible, TArgs...>::value;
 
-
-	variant() noexcept(std::is_nothrow_default_constructible_v<type_at_t<0>>)
-	: m_type_index(0)
+	/* Here the behaviour differs from STL.
+	 * Default initialisation return a value-less variant,
+	 * while in the STL it returns a variant with the first type default-initialised
+	 */
+	variant()
+	: m_type_index(-1)
 	{
-		new(&m_data) type_at_t<0>;
 	}
 	//variant(std::enable_if_t<is_move_constructible, variant&&> other)
 	variant(variant&& other)
 	noexcept(is_nothrow_move_constructible)
 	: m_type_index(other.m_type_index)
 	{
+		if (m_type_index == -1)
+			return;
 		visit([&other](auto& value) {
 			using ValueT = std::remove_reference_t<decltype(value)>;
 			new (&value) ValueT(std::move(other.template get<ValueT>()));
@@ -94,6 +104,8 @@ public:
 	noexcept(is_nothrow_copy_constructible)
 	: m_type_index(other.m_type_index)
 	{
+		if (m_type_index == -1)
+			return;
 		visit([&other](auto& value) {
 			using ValueT = std::remove_reference_t<decltype(value)>;
 			new (&value) ValueT(other.template get<ValueT>());
@@ -170,36 +182,79 @@ public:
 		return m_data < other.m_data;
 	}
 
-	uint index() const
+	int index() const
 	{
 		return m_type_index;
+	}
+
+	/* compiler-dependent stuff */
+	std::string which() const
+	{
+		return visit([](auto& value) {
+			int status;
+			std::unique_ptr<char> name { abi::__cxa_demangle(typeid(std::decay_t<decltype(value)>).name(), 0, 0, &status) };
+			std::string res { name.get() };
+			return res;
+		});
 	}
 
 	template<typename T>
 	T& get()
 	{
-		assert(m_type_index == index_of<T>::value);
+		if (m_type_index != index_of<T>::value)  [[unlikely]]
+		{
+			if (m_type_index < 0)
+				corecpp::throws<corecpp::bad_access>("valueless");
+			int status;
+			std::unique_ptr<char> name { abi::__cxa_demangle(typeid(std::decay_t<T>).name(), 0, 0, &status) };
+			std::string res { name.get() };
+			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
+		}
 		return reinterpret_cast<T&>(*(reinterpret_cast<char*>(m_data)));
 	}
 
 	template<typename T>
 	const T& get() const
 	{
-		assert(m_type_index == index_of<T>::value);
+		if (m_type_index != index_of<T>::value)  [[unlikely]]
+		{
+			if (m_type_index < 0)
+				corecpp::throws<corecpp::bad_access>("valueless");
+			int status;
+			std::unique_ptr<char> name { abi::__cxa_demangle(typeid(std::decay_t<T>).name(), 0, 0, &status) };
+			std::string res { name.get() };
+			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
+		}
 		return *(reinterpret_cast<const T*>(m_data));
 	}
 
 	template<uint pos>
 	typename type_at<pos>::type& at()
 	{
-		assert(m_type_index == pos);
+		if (m_type_index != pos)  [[unlikely]]
+		{
+			if (m_type_index < 0)
+				corecpp::throws<corecpp::bad_access>("valueless");
+			int status;
+			std::unique_ptr<char> name { abi::__cxa_demangle(typeid(std::decay_t<type_at_t<pos>>).name(), 0, 0, &status) };
+			std::string res { name.get() };
+			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
+		}
 		return get<typename type_at<pos>::type>(m_data);
 	}
 
 	template<uint pos>
 	const typename type_at<pos>::type& at() const
 	{
-		assert(m_type_index == pos);
+		if (m_type_index != pos)  [[unlikely]]
+		{
+			if (m_type_index < 0)
+				corecpp::throws<corecpp::bad_access>("valueless");
+			int status;
+			std::unique_ptr<char> name { abi::__cxa_demangle(typeid(std::decay_t<type_at_t<pos>>).name(), 0, 0, &status) };
+			std::string res { name.get() };
+			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
+		}
 		return get<const typename type_at<pos>::type>(m_data);
 	}
 
@@ -211,12 +266,15 @@ public:
 				using ValueT = std::remove_reference_t<decltype(value)>;
 				value.~ValueT();
 			});
+			m_type_index = -1;
 		}
 	}
 
 	template<class VisitorT, typename... ArgsT>
 	auto visit(VisitorT&& visitor, ArgsT&&... args) const
 	{
+		if (m_type_index < 0)  [[unlikely]]
+			corecpp::throws<corecpp::bad_access>("valueless");
 		variant_apply<const variant<TArgs...>, sizeof...(TArgs) - 1, VisitorT, ArgsT...> applier;
 		return applier(*this, std::forward<VisitorT>(visitor), std::forward<ArgsT>(args)...);
 	}
@@ -224,13 +282,17 @@ public:
 	template<class VisitorT, typename... ArgsT>
 	auto visit(VisitorT&& visitor, ArgsT&&... args)
 	{
+		if (m_type_index < 0)  [[unlikely]]
+			corecpp::throws<corecpp::bad_access>("valueless");
 		variant_apply<variant<TArgs...>, sizeof...(TArgs) - 1, VisitorT, ArgsT...> applier;
 		return applier(*this, std::forward<VisitorT>(visitor), std::forward<ArgsT>(args)...);
 	}
-	/* for compatibility with stl */
+	/* for compatibility with STL
+	 * not exclusively due to exception in my implementation
+	 */
 	constexpr bool valueless_by_exception() const noexcept
 	{
-		return false;
+		return (m_type_index < 0);
 	}
 
 	/* required for serialisation */

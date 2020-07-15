@@ -1,18 +1,24 @@
 #ifndef CORECPP_DIAGNOSTIC_H
 #define CORECPP_DIAGNOSTIC_H
 
-#include <vector>
-#include <string>
 #include <chrono>
 #include <ctime>
 #include <iomanip>
 #include <fstream>
 #include <functional>
-#include <unordered_map>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
-#include <chrono>
+#include <unordered_map>
+#include <vector>
+#include <version>
+
+#if __has_include(<source_location>)
+#include <source_location>
+#elif __has_include(<experimental/source_location>)
+#include <experimental/source_location>
+#endif
 
 #include <corecpp/container/ring_buffer.h>
 #include <corecpp/container/waiting_queue.h>
@@ -162,18 +168,14 @@ public:
 	}
 	void append(const event& ev) override
 	{
-#if defined __cplusplus && __cplusplus >= 201402L
 		m_queue.emplace(std::make_unique<event>(ev));
-#else
-		m_queue.emplace(new event(ev));
-#endif
 	}
 };
 
 
 class channel final
 {
-	//NOTE: multhi-treading managment will probably change in near future
+	//NOTE: multhi-treading managment will probably change in the future
 	struct params
 	{
 		diagnostic_level level;
@@ -270,6 +272,12 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::fatal, std::move(message), std::move(details), std::move(file), line);
 	}
+#ifdef __cpp_lib_source_location
+	void fatal(std::string message, std::function<std::string()> details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::fatal, std::move(message), std::move(details), location.file_name(), location.line());
+	}
+#endif
 
 	void error(std::string message, std::string file, uint line) const
 	{
@@ -363,7 +371,7 @@ public:
 	}
 };
 
-/* TODO: Add a defered_event_producer or somethig like that
+/* TODO: Add a defered_event_producer or something like that
  * to allow storing events and writing them at the same time (on a process success/faillure for example)
  */
 

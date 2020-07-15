@@ -19,7 +19,7 @@ namespace corecpp
 	public:
 		template <typename StringT>
 #if __cplusplus > 201703L
-		error(StringT&& message,  const std::source_location& location = std::source_location::current())
+		error(StringT&& message, const std::source_location& location = std::source_location::current())
 		: ExceptionT(std::forward<StringT>(message)), m_location(location)
 #else
 		error(StringT&& message)
@@ -40,6 +40,14 @@ namespace corecpp
 				" "s, ExceptionT::what()});
 		}
 #endif
+	};
+
+	struct bad_access : public error<std::logic_error>
+	{
+		template<typename... ArgsT>
+		bad_access(ArgsT&&... args)
+		: error<std::logic_error> { std::forward<ArgsT>(args)... }
+		{ };
 	};
 
 	struct lexical_error : public error<std::runtime_error>
