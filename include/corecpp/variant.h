@@ -228,6 +228,29 @@ public:
 		return *(reinterpret_cast<const T*>(m_data));
 	}
 
+	template<typename T, typename ArgT>
+	variant& set (ArgT&& arg)
+	{
+		using ValueT = std::remove_reference_t<T>;
+		if (static_cast<const void*>(std::addressof(this->m_data))
+			== static_cast<const void*>(std::addressof(arg)))
+			return *this;
+		reset();
+		m_type_index = index_of<T>::value;
+		new (m_data) ValueT(std::forward<ArgT>(arg));
+		return *this;
+	}
+
+	template<typename T, typename... ArgsT>
+	variant& set (ArgsT&&... args)
+	{
+		using ValueT = std::remove_reference_t<T>;
+		reset();
+		m_type_index = index_of<T>::value;
+		new (m_data) ValueT(std::forward<ArgsT>(args)...);
+		return *this;
+	}
+
 	template<uint pos>
 	typename type_at<pos>::type& at()
 	{
@@ -287,12 +310,16 @@ public:
 		variant_apply<variant<TArgs...>, sizeof...(TArgs) - 1, VisitorT, ArgsT...> applier;
 		return applier(*this, std::forward<VisitorT>(visitor), std::forward<ArgsT>(args)...);
 	}
+	constexpr bool valueless() const noexcept
+	{
+		return (m_type_index < 0);
+	}
 	/* for compatibility with STL
-	 * not exclusively due to exception in my implementation
+	 * not exclusively due to exception in my implementation, but the name of this method is just stupid
 	 */
 	constexpr bool valueless_by_exception() const noexcept
 	{
-		return (m_type_index < 0);
+		return valueless();
 	}
 
 	/* required for serialisation */

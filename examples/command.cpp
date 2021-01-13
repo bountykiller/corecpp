@@ -8,7 +8,7 @@ int add(corecpp::command_line& line)
 	int a, b;
 	bool show_help = false;
 	corecpp::command_line_parser addition(line);
-	addition.add_option('h', "help", "show help message", show_help);
+	addition.add_option('h', "help", "Will compute the addition of 2 values", show_help);
 	addition.add_param("a", "first number", a);
 	addition.add_param("b", "second number", b);
 	addition.parse_options();
@@ -29,7 +29,7 @@ int mul(corecpp::command_line& line)
 	int a, b, c = 1;
 	bool show_help = false;
 	corecpp::command_line_parser multiplication(line);
-	multiplication.add_option({ 'h', "help", "show help message", show_help });
+	multiplication.add_option({ 'h', "help", "Will compute the product of 2 values", show_help });
 	multiplication.add_params(
 		corecpp::program_parameter { "a", "first number", a, },
 		corecpp::program_parameter { "b", "second number", b },
@@ -54,7 +54,7 @@ int divise(corecpp::command_line& line)
 	int a, b;
 	bool show_help = false;
 	corecpp::command_line_parser division(line);
-	division.add_option({ 'h', "help", "show help message", show_help });
+	division.add_option({ 'h', "help", "Will divide the 1st number by the second", show_help });
 	division.add_params(
 		corecpp::program_parameter { "a", "first number", a },
 		corecpp::program_parameter { "b", "second number (should be != 0)", b/*, corecpp::is_not_equal(0)*/}

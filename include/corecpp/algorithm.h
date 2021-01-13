@@ -172,7 +172,7 @@ namespace corecpp
 		for (const auto& tmp : mapping)
 		{
 			if (!comparer.compare(str.data(), str.data() + str.size(),
-								tmp.second.data(), tmp.second.data() + tmp.second.size()))
+				tmp.second.data(), tmp.second.data() + tmp.second.size()))
 			{
 				value = tmp.first;
 				return true;

@@ -49,7 +49,7 @@ public:
 	{
 		return decimal(*this) += other;
 	}
-	
+
 	decimal& operator-=(decimal other)
 	{
 		m_value -= other.m_value;
@@ -80,7 +80,7 @@ public:
 		return decimal(*this) /= other;
 	}
 };
-	
+
 }
 
 #endif

@@ -42,6 +42,14 @@ namespace corecpp
 #endif
 	};
 
+	struct unimplemented : public error<std::logic_error>
+	{
+		template<typename... ArgsT>
+		unimplemented(ArgsT&&... args)
+		: error<std::logic_error> { std::forward<ArgsT>(args)... }
+		{ };
+	};
+
 	struct bad_access : public error<std::logic_error>
 	{
 		template<typename... ArgsT>

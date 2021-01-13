@@ -52,7 +52,6 @@ private:
 		size_type m_reserved;
 		size_type m_size;
 		T *m_data;
-		std::vector<int> a;
 	};
 	block* m_block;
 
