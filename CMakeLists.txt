@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.8)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17)
-set(CORECPP_VERSION "0.4")
+set(CORECPP_VERSION "0.41")
 set(PKGCONFIG_DIR ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig)
 set(CMAKE_DIR ${CMAKE_INSTALL_PREFIX}/lib/cmake/corecpp)
 set(PKGCONFIG_FILES ${CMAKE_CURRENT_BINARY_DIR}/corecpp.pc)
@@ -22,6 +22,7 @@ if(BUILD_EXAMPLES)
 endif(BUILD_EXAMPLES)
 
 if(RUN_TESTS)
+	enable_testing ()
 	add_subdirectory(tests)
 endif(RUN_TESTS)
 

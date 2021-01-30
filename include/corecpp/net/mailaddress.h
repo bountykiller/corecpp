@@ -9,9 +9,6 @@
 namespace corecpp
 {
 
-namespace net
-{
-
 class mailaddress final
 {
 	std::string m_value;
@@ -78,8 +75,6 @@ public:
 static inline const std::string& to_string(const mailaddress& m)
 {
 	return m.str();
-}
-
 }
 
 }

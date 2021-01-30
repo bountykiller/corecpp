@@ -13,8 +13,6 @@
 namespace corecpp
 {
 
-namespace net
-{
 /* RFC 3986
  * URI = scheme ":" hier-part [ "?" query ] [ "#" fragment ]
  */
@@ -109,8 +107,6 @@ public:
 static inline const std::string& to_string(const uri& u)
 {
 	return u.str();
-}
-
 }
 
 }

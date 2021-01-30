@@ -103,7 +103,9 @@ namespace corecpp
 			++m_count;
 			return true;
 		}
-		/* data could be overwritten
+		/**
+		 * \brief Push data at the end of the buffer
+		 * \warning data could be overwritten when the buffer is full (FIFO)
 		 */
 		template<typename ...ArgsT>
 		void emplace_back(ArgsT&&... args)

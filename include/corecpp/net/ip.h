@@ -4,24 +4,19 @@
 
 namespace corecpp
 {
-	
-namespace net
-{
-	
+
 struct cidr
 {
-	
-	
+
+
 };
 
 struct inet_addr
 {
-	
-	
+
+
 };
-	
-}
-	
+
 }
 
 #endif

@@ -5,7 +5,8 @@
  *      Author: bountykiller
  */
 #include <iostream>
-#include <corecpp/command_line.h>
+#include <corecpp/cli/command_line.h>
+#include <corecpp/cli/parser.h>
 
 namespace corecpp
 {
@@ -42,9 +43,8 @@ void command_line_parser::parse_options(void)
 			auto option = get_option(param);
 			if (option == m_options.end())
 				throw std::invalid_argument(param);
-			if (option->require_value() && (pos == std::string::npos))
-				throw value_error(param);
-			option->read(value);
+			long_option_parser parser { value };
+			option->read(parser);
 		}
 		else if (param[0] == '-')
 		{
@@ -59,25 +59,8 @@ void command_line_parser::parse_options(void)
 				auto option = get_option(shortname);
 				if(option == m_options.end())
 					throw std::invalid_argument(std::string(1, shortname));
-
-				if (++iter == param.end())//last option => must give the value to it
-				{
-					if (!value && option->require_value())
-						throw value_error(param);
-					if (option->require_value())
-					{
-						value = m_command_line.read(); //consume the parameter
-						option->read(value);
-					}
-					else
-						option->read("");
-				}
-				else //not the last parameter => should not need a value
-				{
-					if (option->require_value())
-						throw value_error(param);
-					option->read("");
-				}
+				short_option_parser parser { m_command_line };
+				option->read(parser);//consume the parameter
 			}
 		}
 	}
@@ -129,17 +112,17 @@ void command_line_parser::usage()
 
 void command_line_parser::parse_parameters(void)
 {
+	argument_parser parser { m_command_line };
 	for (const auto& parameter : m_params)
 	{
-		const char* token = m_command_line.read();
-		if (!token)
-		{
-			if (parameter.is_required())
-				throw value_error(parameter.name());
-			else
-				return;
-		}
-		parameter.read(token);
+		 /* read the token from the command line.
+		  * won't work for booleans
+		  * ==> make a cli directory, move stuff there, put parsers in a separate file and create a parameter parser
+		  */
+		if (m_command_line.peek() != nullptr)
+			parameter.read(parser);
+		else if (parameter.is_required())
+			corecpp::throws<value_error>(parameter.name());
 	}
 }
 

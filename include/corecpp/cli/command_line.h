@@ -10,26 +10,22 @@
 #include <sstream>
 #include <string>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 #include <corecpp/algorithm.h>
 #include <corecpp/diagnostic.h>
+#include <corecpp/except.h>
 
+#include <corecpp/serialization/common.h>
+
+#include <corecpp/cli/parser.h>
 
 /* TODO: Manage options groups
  */
 
 namespace corecpp
 {
-	struct value_error : std::invalid_argument
-	{
-		value_error(const char* message)
-		: invalid_argument(message)
-		{}
-		value_error(const std::string& message)
-		: invalid_argument(message)
-		{}
-	};
 
 	/**
 	 * \brief interface used for reading command_line option
@@ -38,21 +34,22 @@ namespace corecpp
 	{
 	public:
 		/**
-			* \brief say if the reader accepts the value to be an empty string
-			* \retval true if the reader expects the value to never be an empty string
-			* \retval false if the reader accept the value to be an empty string
-			*/
+		 * \brief say if the reader accepts the value to be an empty string
+		 * \retval true if the reader expects the value to never be an empty string
+		 * \retval false if the reader accept the value to be an empty string
+		 */
 		virtual ~option_reader()
 		{}
-		virtual bool require_value() const = 0;
-		virtual void read(const std::string& arg_value) const = 0;
+		virtual void read(short_option_parser& parser) const = 0;
+		virtual void read(long_option_parser& parser) const = 0;
+		virtual void read(argument_parser& parser) const = 0;
 	};
 
 	/**
 	 * \brief class intented to read most of the possible option from the command line
 	 * require T to define the '>>' operator
 	 */
-	template <typename T>
+	template <typename T, typename Enable = void>
 	class generic_option : public option_reader
 	{
 		T& m_value;
@@ -60,118 +57,46 @@ namespace corecpp
 		using value_type = T;
 		generic_option(T& value) : m_value(value)
 		{}
-		bool require_value() const
+		void read(short_option_parser& parser) const override
 		{
-			return true;
+			parser.deserialize(m_value);
 		}
-		void read(const std::string& arg_value) const
+		void read(long_option_parser& parser) const override
 		{
-			if(arg_value.empty())
-				return;
-			std::istringstream iss(arg_value);
-			iss >> m_value;
+			parser.deserialize(m_value);
+		}
+		void read(argument_parser& parser) const override
+		{
+			parser.deserialize(m_value);
 		}
 	};
 
 	/**
 	 * \brief specialization for boolean. Will return true if the option is present without a value
 	 */
-	template <>
-	class generic_option<bool> : public option_reader
+	template <typename T>
+	class generic_option<T, std::enable_if_t<std::is_same_v<T, bool>>> : public option_reader
 	{
 		bool& m_value;
 	public:
 		using value_type = bool;
 		generic_option(bool& value) : m_value(value)
 		{}
-		bool require_value() const
+		void read([[maybe_unused]]short_option_parser& parser) const override
 		{
-			return false;
-		}
-		void read(const std::string& arg_value) const
-		{
-			if(arg_value.empty())
-				m_value = true;
-			else
-			{
-				std::istringstream iss(arg_value);
-				iss >> m_value;
-			}
+			// In short form, boolean is set to true if the parameter is present.
+			// No more parsing is required
+			m_value = true;
 		};
-	};
-
-	/**
-	 * \brief specialization for wstring.
-	 */
-	template <>
-	class generic_option<std::wstring> : public option_reader
-	{
-		std::wstring& m_value;
-	public:
-		using value_type = std::wstring;
-		generic_option(std::wstring& value) : m_value(value)
-		{}
-		bool require_value() const
+		void read(long_option_parser& parser) const override
 		{
-			return true;
+			parser.deserialize(m_value);
 		}
-		void read(const std::string& arg_value) const
+		void read(argument_parser& parser) const override
 		{
-			if(arg_value.empty())
-				return;
-			m_value = std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(arg_value);
-		};
-	};
-
-	/**
-	 * \brief abstraction of command line arguments
-	 */
-	class command_line final
-	{
-		int m_argc;
-		char** m_argv;
-		int m_pos = 0;
-		std::vector<int> m_commands;	/* Will store the index of the commands once they are read.
-										 * Necessary to allow the parser to show the full command
-										 * on usage calls.
-										 */
-	public:
-		command_line(int argc, char** argv)
-		: m_argc(argc), m_argv(argv), m_pos(0)
-		{
-		}
-		const char* program() const
-		{
-			return m_argv[0];
-		}
-		const char* peek()
-		{
-			if (m_pos >= m_argc)
-				return nullptr;
-			return m_argv[m_pos+1];
-		}
-		const char* read()
-		{
-			if (m_pos >= m_argc)
-				return nullptr;
-			return m_argv[++m_pos];
-		}
-		/**
-		 * \brief register an argument as being identified as a (sub-)command
-		 */
-		void store_command(void)
-		{
-			m_commands.push_back(m_pos);
-		}
-		std::string commands() const
-		{
-			std::string res;
-			for(int command : m_commands)
-				res.append(" ").append(m_argv[command]);
-			return res;
+			parser.deserialize(m_value);
 		}
 	};
-
 
 	/**
 	 *\brief parameters lies at the end of the command line
@@ -202,9 +127,9 @@ namespace corecpp
 		{
 			return !m_optional;
 		}
-		void read(const std::string& arg_value) const
+		void read(argument_parser& parser) const
 		{
-			m_reader->read(arg_value);
+			m_reader->read(parser);
 		};
 	};
 
@@ -239,14 +164,14 @@ namespace corecpp
 		{
 			return shortname == m_shortname;
 		}
-		bool require_value() const
+		void read(short_option_parser& parser) const
 		{
-			return m_reader->require_value();
+			m_reader->read(parser);
 		}
-		void read(const std::string& arg_value) const
+		void read(long_option_parser& parser) const
 		{
-			m_reader->read(arg_value);
-		}
+			m_reader->read(parser);
+		};
 		std::string helpmsg() const
 		{
 			if (!m_shortname)
@@ -313,16 +238,16 @@ namespace corecpp
 
 		auto get_option(const std::string& name) const
 		{
-			return std::find_if(std::cbegin(m_options), std::cend(m_options), [&](const program_option& o){ return o.match(name); });
+			return std::find_if (std::cbegin(m_options), std::cend(m_options), [&](const program_option& o){ return o.match(name); });
 		}
 		auto get_command(const std::string& name) const
 		{
-			return std::find_if(std::cbegin(m_commands), std::cend(m_commands), [&](const program_command& c){ return c.match(name); });
+			return std::find_if (std::cbegin(m_commands), std::cend(m_commands), [&](const program_command& c){ return c.match(name); });
 		}
 
 		auto get_option(char shortname) const
 		{
-			return std::find_if(std::cbegin(m_options), std::cend(m_options), [&](const program_option& o){ return o.match(shortname); });
+			return std::find_if (std::cbegin(m_options), std::cend(m_options), [&](const program_option& o){ return o.match(shortname); });
 		}
 
 	public:

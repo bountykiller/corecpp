@@ -4,16 +4,11 @@
 namespace corecpp
 {
 
-namespace net
-{
-
 struct mac_addr
 {
 
 
 };
-
-}
 
 }
 

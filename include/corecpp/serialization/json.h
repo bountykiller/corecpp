@@ -310,7 +310,7 @@ namespace corecpp
 		};
 
 		/* TODO:
-		 * Add pretty printinf managment
+		 * Add pretty printf managment
 		 */
 		class serializer
 		{
@@ -528,6 +528,11 @@ namespace corecpp
 		};
 
 
+
+		/**
+		* \brief class used to deserialize a stream formatted into json
+		* \implements deserialiser concept
+		*/
 		class deserializer
 		{
 			std::istream& m_stream;
@@ -788,11 +793,9 @@ namespace corecpp
 					return; /* empty array */
 				do
 				{
-					using ElemT = typename ValueT::value_type;
-					ElemT elem;
+					value.emplace_back();
+					deserialize(value.back());
 
-					deserialize(elem);
-					value.emplace_back(std::move(elem));
 					read();
 					if (m_current.index() != token::index_of<comma_token>::value)
 						break;

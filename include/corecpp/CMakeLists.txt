@@ -1,3 +1,4 @@
+add_subdirectory(cli)
 add_subdirectory(container)
 add_subdirectory(serialization)
 add_subdirectory(meta)
