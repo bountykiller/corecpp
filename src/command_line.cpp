@@ -11,6 +11,13 @@
 namespace corecpp
 {
 
+corecpp::diagnostic::event_producer& command_line::logger()
+{
+	static auto& channel = corecpp::diagnostic::manager::get_channel("command_line");
+	static auto logger = corecpp::diagnostic::event_producer(channel);
+	return logger;
+}
+
 corecpp::diagnostic::event_producer& command_line_parser::logger()
 {
 	static auto& channel = corecpp::diagnostic::manager::get_channel("command_line_parser");
@@ -53,7 +60,7 @@ void command_line_parser::parse_options(void)
 			if(value && *value == '-') //another option
 				value = nullptr;
 			//for loop because we can have multiple params
-			for(auto iter = param.begin(); iter != param.end(); )
+			for(auto iter = param.begin(); iter != param.end(); ++iter)
 			{
 				char shortname = *iter;
 				auto option = get_option(shortname);

@@ -55,7 +55,7 @@ struct user
 	std::vector<std::shared_ptr<group>> groups;
 	std::string firstname;
 	std::string lastname;
-	std::unique_ptr<corecpp::net::mailaddress> email;
+	std::unique_ptr<corecpp::mailaddress> email;
 	std::chrono::system_clock::time_point creation_date;
 	static const auto& properties()
 	{

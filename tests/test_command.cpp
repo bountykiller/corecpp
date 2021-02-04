@@ -1,6 +1,7 @@
+#include <cstring>
 #include <iostream>
 #include <corecpp/diagnostic.h>
-#include <corecpp/command_line.h>
+#include <corecpp/cli/command_line.h>
 //#include <corecpp/meta/validator.h>
 #include <corecpp/unittest.h>
 
@@ -8,6 +9,34 @@ using namespace corecpp;
 
 class test_option final : public test_fixture
 {
+	template <typename TestT>
+	void do_test(const program_option& option, const TestT& t,
+				decltype(TestT::expected)& actual) const
+	{
+		actual = decltype(TestT::expected) { }; // reset the value to avoid side effects between tests
+		if (t.arg.length() == 1)
+		{
+			assert_equal(option.match(t.arg[0]), t.match);
+			if (t.match)
+			{
+				const char* argv[2] = { "test", t.value.c_str() };
+				command_line line { 2, const_cast<char**>(argv) }; // ugly, I know
+				short_option_parser p { line };
+				option.read(p);
+			}
+		}
+		else
+		{
+			assert_equal(option.match(t.arg), t.match);
+			if (t.match)
+			{
+				long_option_parser p { t.value };
+				option.read(p);
+			}
+		}
+		assert_equal(actual, t.expected);
+	}
+
 	test_case_result test_int() const
 	{
 		struct test {
@@ -28,15 +57,9 @@ class test_option final : public test_fixture
 		});
 
 		return run(tests, [&](const test& t){
-			int actual = 0;
+			int actual;
 			program_option option('i',"int", "an integer value", actual);
-			if (t.arg.length() == 1)
-				assert_equal(option.match(t.arg[0]), t.match);
-			else
-				assert_equal(option.match(t.arg), t.match);
-			if (t.match)
-				option.read(t.value);
-			assert_equal(actual, t.expected);
+			do_test(option, t, actual);
 		});
 	}
 
@@ -52,7 +75,7 @@ class test_option final : public test_fixture
 		test_cases<test> tests ({
 			{ "b", "", true, true },
 			{ "b", "1", true, true },
-			{ "b", "0", true, false },
+			{ "b", "0", true, true },
 			{ "a_bool", "false", true, false },
 			{ "a_bool", "aaa", true, false },
 			{ "a_bool", "", true, true },
@@ -65,13 +88,7 @@ class test_option final : public test_fixture
 		return run(tests, [&](const test& t){
 			bool actual = false;
 			program_option option('b',"a_bool", "a boolean", actual);
-			if (t.arg.length() == 1)
-				assert_equal(option.match(t.arg[0]), t.match);
-			else
-				assert_equal(option.match(t.arg), t.match);
-			if (t.match)
-				option.read(t.value);
-			assert_equal(actual, t.expected);
+			do_test(option, t, actual);
 		});
 	}
 
@@ -99,24 +116,52 @@ class test_option final : public test_fixture
 
 		return run(tests, [&](const test& t){
 			std::string actual;
-			program_option option('s',"str", "a boolean", actual);
-			if (t.arg.length() == 1)
-				assert_equal(option.match(t.arg[0]), t.match);
-			else
-				assert_equal(option.match(t.arg), t.match);
-			if (t.match)
-				option.read(t.value);
-			assert_equal(actual, t.expected);
+			program_option option('s',"str", "a string value", actual);
+			do_test(option, t, actual);
+		});
+	}
+
+	test_case_result test_vector() const
+	{
+		struct test {
+			std::string arg;
+			std::string value;
+			bool match;
+			std::vector<int> expected;
+		};
+
+		test_cases<test> tests ({
+			{ "v", "", true, { } },
+			{ "v", "1", true, { } },
+			{ "v", "1 2 3", true, { 1, 2, 3 } },
+			{ "v", "1 a 3", true, { } },
+			{ "vector", "", true, { } },
+			{ "vector", "1", true, { } },
+			{ "vector", "1,2,3", true, { 1, 2, 3 } },
+			{ "i", "", false, { } },
+			{ "i", "true", false, { } },
+			{ "unknown", "", false, { } },
+			{ "unknown", "true", false, { } },
+		});
+
+		return run(tests, [&](const test& t){
+			std::vector<int> actual;
+			program_option option('v',"vector", "a vector of integers", actual);
+			do_test(option, t, actual);
 		});
 	}
 
 public:
 	tests_type tests() const override
 	{
+		/* TODO:
+		 * Add tests for utf8 & co
+		 */
 		return {
 			{ "test_int", [&] () { return test_int(); } },
 			{ "test_bool", [&] () { return test_bool(); } },
-			{ "test_str", [&] () { return test_str(); } }
+			{ "test_str", [&] () { return test_str(); } },
+			{ "test_vector", [&] () { return test_vector(); } },
 		};
 	}
 };

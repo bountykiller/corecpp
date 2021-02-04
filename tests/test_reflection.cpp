@@ -11,7 +11,7 @@
 
 using namespace corecpp;
 
-struct test_reflection final : public test_fixture
+class test_reflection final : public test_fixture
 {
 	test_case_result test_is_iterable() const
 	{

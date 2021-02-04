@@ -29,6 +29,8 @@ namespace corecpp
 	 */
 	class command_line final
 	{
+		static corecpp::diagnostic::event_producer& logger();
+
 		int m_argc;
 		char** m_argv;
 		int m_pos = 0;
@@ -63,6 +65,7 @@ namespace corecpp
 		{
 			if (m_pos >= m_argc)
 				return nullptr;
+			logger().info(corecpp::concat<std::string>({"read ", m_argv[m_pos+1]}), __FILE__, __LINE__);
 			return m_argv[++m_pos];
 		}
 		/**
@@ -94,39 +97,21 @@ namespace corecpp
 		std::istringstream m_stream;
 
 		template <typename IntegralT, typename = std::enable_if<std::is_integral<IntegralT>::value, IntegralT>>
-		static void deserialize(std::istringstream& stream, IntegralT& value)
+		static void deserialize(std::istream& stream, IntegralT& value)
 		{
 			stream >> value;
 		}
-		static void deserialize(std::istringstream& stream, std::string& value)
-		{
-			value = stream.str(); /* no further action needed as char unescaping should have been done by the shell */
-		}
-		static void deserialize(std::istringstream& stream, std::wstring& value)
-		{
-			read_string(stream, value);
-		}
-		static void deserialize(std::istringstream& stream, std::u16string& value)
-		{
-			read_string(stream, value);
-		}
-		static void deserialize(std::istringstream& stream, std::u32string& value)
-		{
-			read_string(stream, value);
-		}
 
 		template <typename StringT>
-		static void read_string(std::istringstream& stream, StringT& value)
+		static void convert_string(const std::string& parameter, StringT& value)
 		{
 			using char_type = typename StringT::value_type;
-			std::string parameter;
-			stream >> parameter;
 			std::wstring_convert<std::codecvt_utf8<char_type>, char_type> converter;
 			value = converter.from_bytes(parameter);
 		}
 
 	public:
-		long_option_parser(const std::string& parameter)
+		explicit long_option_parser(const std::string& parameter)
 		: m_stream(parameter)
 		{
 			m_stream.exceptions(std::ios_base::failbit | std::ios_base::badbit);
@@ -208,19 +193,19 @@ namespace corecpp
 		}
 		void deserialize(std::string& value)
 		{
-			deserialize(m_stream, value);
+			value = m_stream.str(); /* no further action needed as char unescaping should have been done by the shell */
 		}
 		void deserialize(std::wstring& value)
 		{
-			deserialize(m_stream, value);
+			convert_string(m_stream.str(), value);
 		}
 		void deserialize(std::u16string& value)
 		{
-			deserialize(m_stream, value);
+			convert_string(m_stream.str(), value);
 		}
 		void deserialize(std::u32string& value)
 		{
-			deserialize(m_stream, value);
+			convert_string(m_stream.str(), value);
 		}
 		template <typename ValueT, typename Enable = void>
 		void deserialize(ValueT& value)
@@ -350,7 +335,7 @@ namespace corecpp
 		 * \retval true if the reader expects the value to never be an empty string
 		 * \retval false if the reader accept the value to be an empty string
 		 */
-		short_option_parser(command_line& line) noexcept
+		explicit short_option_parser(command_line& line) noexcept
 		: m_line(line)
 		{
 		}
@@ -534,7 +519,7 @@ namespace corecpp
 		 * \retval true if the reader expects the value to never be an empty string
 		 * \retval false if the reader accept the value to be an empty string
 		 */
-		argument_parser(command_line& line) noexcept
+		explicit argument_parser(command_line& line) noexcept
 		: m_line(line)
 		{
 		}
@@ -624,7 +609,7 @@ namespace corecpp
 		template <typename ValueT, typename Enable = void>
 		void deserialize(ValueT& value)
 		{
-			deserialize_impl<short_option_parser, ValueT> impl;
+			deserialize_impl<argument_parser, ValueT> impl;
 			impl(*this, value);
 		}
 

@@ -11,8 +11,11 @@
 #include <vector>
 
 #include <corecpp/except.h>
-#include <corecpp/command_line.h>
-#include <corecpp/graphics.h>
+
+#include <corecpp/cli/command_line.h>
+#include <corecpp/cli/graphics.h>
+
+#include <corecpp/serialization/json.h>
 
 
 namespace corecpp
@@ -115,9 +118,14 @@ namespace corecpp
 			if (!res)
 			{
 				std::ostringstream oss;
+				corecpp::json::serializer serializer { oss };
+
 				if (m_result < test_result::FAILURE)
 					m_result = test_result::FAILURE;
-				oss << "Error at index " << m_current_test_index <<  ": " << "actual: " << actual << "\texpected:" << expected;
+				oss << "Error at index " << m_current_test_index <<  ": " << "actual: ";
+				serializer.serialize(actual);
+				oss << "\texpected:";
+				serializer.serialize(expected);
 				m_errors.emplace_back(oss.str());
 			}
 		}
@@ -244,7 +252,7 @@ namespace corecpp
 		virtual tests_type tests() const = 0;
 	};
 
-	class test_unit
+	class test_unit final
 	{
 		bool m_verbose = false;
 		std::string m_name;
@@ -293,14 +301,16 @@ namespace corecpp
 						std::cout << std::string(padding, '.')
 							<< graphic_rendition_v<sgr_p::fg_red> << "FATAL"
 							<< graphic_rendition_v<sgr_p::all_off> << "\n";
-						result.dump_errors(std::cout);
+						if (m_verbose)
+							result.dump_errors(std::cout);
 						break;
 					case test_result::EXCEPT:
 						res = EXIT_FAILURE;
 						std::cout << std::string(padding, '.')
 							<< graphic_rendition_v<sgr_p::fg_red> << "!!! EXCEPTION !!!"
 							<< graphic_rendition_v<sgr_p::all_off> << "\n";
-						result.dump_errors(std::cout);
+						if (m_verbose)
+							result.dump_errors(std::cout);
 						break;
 				}
 			}
@@ -328,19 +338,32 @@ namespace corecpp
 		{
 			command_line command { argc, argv };
 			command_line_parser parser { command };
+			bool help;
 
 			std::cout << "\nSuite " << m_name << "\n" << std::string(m_name.length() + 6, '=')  << "\n\n";
 
+			/* diagnostic::manager::default_channel().set_level(diagnostic::diagnostic_level::debug); */
 			parser.add_option('v', "verbose", "activate verbose mode", m_verbose);
+			parser.add_option('h', "help", "show help message", help);
+			/* TODO: Add debug level option */
 			for (const auto& f : m_fixtures)
 			{
-				parser.add_command(f.first, f.first, [&] (command_line& c){
-					return run_fixture(f.first, *f.second);
-				});
+				parser.add_command(f.first,
+					corecpp::concat<std::string>({ "Run test '", f.first, "'"}),
+					[&] (command_line& c){
+						return run_fixture(f.first, *f.second);
+					});
 			}
 			parser.parse_options();
+
+			if (help)
+			{
+				parser.usage();
+				return EXIT_SUCCESS;
+			}
+
 			int res = parser.execute();
-			if (res <= 0)
+			if (res < 0) /* no commands found */
 			{
 				res = EXIT_SUCCESS;
 				for (const auto& f : m_fixtures)

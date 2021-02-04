@@ -166,11 +166,27 @@ namespace corecpp
 		}
 		void read(short_option_parser& parser) const
 		{
-			m_reader->read(parser);
+			try
+			{
+				m_reader->read(parser);
+			}
+			catch (corecpp::value_error& e)
+			{
+				corecpp::throws<std::invalid_argument>(
+					corecpp::concat<std::string>({ std::to_string(m_shortname), " : ", e.what() }));
+			}
 		}
 		void read(long_option_parser& parser) const
 		{
-			m_reader->read(parser);
+			try
+			{
+				m_reader->read(parser);
+			}
+			catch (corecpp::value_error& e)
+			{
+				corecpp::throws<std::invalid_argument>(
+					corecpp::concat<std::string>({ m_name, " : ", e.what() }));
+			}
 		};
 		std::string helpmsg() const
 		{
