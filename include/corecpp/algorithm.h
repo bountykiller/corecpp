@@ -4,12 +4,11 @@
 #include <algorithm>
 #include <initializer_list>
 #include <locale>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
-#include <string>
-#include <mutex>
 #include <utility>
 
 
@@ -100,6 +99,12 @@ namespace corecpp
 			++el; ++pos;
 		}
 		return true;
+	}
+
+	template<typename T, typename = std::enable_if_t<std::is_pointer_v<T>> >
+	T get_or_def(const T value, const T def)
+	{
+		return value ? value : def;
 	}
 
 	template<typename StringT>

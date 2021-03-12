@@ -82,6 +82,14 @@ namespace corecpp
 		{ };
 	};
 
+	struct format_error : public error<std::invalid_argument>
+	{
+		template<typename... ArgsT>
+		format_error(ArgsT&&... args)
+		: error<std::invalid_argument> { std::forward<ArgsT>(args)... }
+		{ };
+	};
+
 	template<typename ExceptionT, typename... ArgsT>
 	[[ noreturn ]] ExceptionT throws(ArgsT&&... args)
 	{

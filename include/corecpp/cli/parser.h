@@ -9,21 +9,12 @@
 #include <vector>
 
 #include <corecpp/except.h>
+#include <corecpp/algorithm.h>
 
 #include <corecpp/serialization/common.h>
 
 namespace corecpp
 {
-	struct value_error : std::invalid_argument
-	{
-		value_error(const char* message)
-		: invalid_argument(message)
-		{}
-		value_error(const std::string& message)
-		: invalid_argument(message)
-		{}
-	};
-
 	/**
 	 * \brief abstraction of command line arguments
 	 */
@@ -53,9 +44,10 @@ namespace corecpp
 		 */
 		const char* peek() const noexcept
 		{
-			if (m_pos >= m_argc)
+			int pos = m_pos+1;
+			if (pos >= m_argc)
 				return nullptr;
-			return m_argv[m_pos+1];
+			return m_argv[pos];
 		}
 		/**
 		 * \brief read next command line argument and advance by 1
@@ -63,10 +55,16 @@ namespace corecpp
 		 */
 		const char* read() noexcept
 		{
+			m_pos += 1;
 			if (m_pos >= m_argc)
 				return nullptr;
-			logger().info(corecpp::concat<std::string>({"read ", m_argv[m_pos+1]}), __FILE__, __LINE__);
-			return m_argv[++m_pos];
+			try
+			{
+				logger().info(corecpp::concat<std::string>({"read '", m_argv[m_pos], "'"}), __FILE__, __LINE__);
+			}
+			catch(...)
+			{}
+			return m_argv[m_pos];
 		}
 		/**
 		 * \brief register an argument as being identified as a (sub-)command
@@ -94,6 +92,7 @@ namespace corecpp
 	 */
 	class long_option_parser
 	{
+		static corecpp::diagnostic::event_producer& logger();
 		std::istringstream m_stream;
 
 		template <typename IntegralT, typename = std::enable_if<std::is_integral<IntegralT>::value, IntegralT>>
@@ -115,6 +114,7 @@ namespace corecpp
 		: m_stream(parameter)
 		{
 			m_stream.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+			logger().trace(corecpp::concat<std::string>({ "parsing ", parameter }), __FILE__, __LINE__);
 		}
 
 		void deserialize(bool& value)
@@ -143,7 +143,7 @@ namespace corecpp
 				&& lcase != "off"
 				&& lcase != "no"
 				&& lcase != "0")
-				corecpp::throws<corecpp::value_error>("boolean expected");
+				corecpp::throws<std::ios_base::failure>("boolean expected");
 		}
 		void deserialize(int8_t& value)
 		{
@@ -227,20 +227,18 @@ namespace corecpp
 		template <typename ValueT>
 		void read_array(ValueT& value)
 		{
-			std::stringstream buffer;
-			do
+			while (!m_stream.eof())
 			{
-				for (char c = m_stream.get();
-					c != ',' && c != std::char_traits<char>::eof();
-					c = m_stream.get())
-				{
-					buffer << c;
-				}
+				std::string tmp;
+				std::getline(m_stream, tmp, ',');
+				if (tmp.empty())
+					continue;
+
+				std::istringstream buffer { std::move(tmp) };
+				buffer.exceptions(std::ios_base::failbit | std::ios_base::badbit);
 				value.emplace_back();
 				deserialize(buffer, value.back());
-				buffer.str("");
 			}
-			while (!m_stream.eof());
 		}
 		/* required for variant */
 		template <typename ValueT>
@@ -304,6 +302,7 @@ namespace corecpp
 	 */
 	class short_option_parser
 	{
+		static corecpp::diagnostic::event_producer& logger();
 		command_line& m_line;
 
 		template<typename IntegralT, typename = std::enable_if<std::is_integral<IntegralT>::value, IntegralT>>
@@ -311,6 +310,7 @@ namespace corecpp
 		{
 			const char* parameter = m_line.read();
 			std::istringstream iss(parameter);
+			iss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
 			iss >> value;
 		}
 		template<typename FloatT, typename = std::enable_if<std::is_integral<FloatT>::value, FloatT>>
@@ -318,6 +318,7 @@ namespace corecpp
 		{
 			const char* parameter = m_line.read();
 			std::istringstream iss(parameter);
+			iss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
 			iss >> value; //OK?
 		}
 		template <typename StringT>
@@ -338,6 +339,10 @@ namespace corecpp
 		explicit short_option_parser(command_line& line) noexcept
 		: m_line(line)
 		{
+			logger().trace(corecpp::concat<std::string>({ "parsing " }),[&] {
+					return corecpp::get_or_def(line.peek(), "<empty>");
+				},
+				__FILE__, __LINE__);
 		}
 		void deserialize(int8_t& value)
 		{
@@ -420,11 +425,16 @@ namespace corecpp
 		void read_array(ValueT& value)
 		{
 			for (const char* parameter = m_line.peek();
-				parameter[0] && parameter[0] != '-';
-				)
+				parameter && parameter[0] != '-';
+				parameter = m_line.peek())
 			{
+				if (!parameter[0])
+				{
+					m_line.read();
+					continue;
+				}
 				value.emplace_back();
-				deserialize(value.back()); //will consume the parameter
+				deserialize(value.back());
 			}
 		}
 		/* required for variant */
@@ -543,7 +553,7 @@ namespace corecpp
 				&& lcase != "off"
 				&& lcase != "no"
 				&& lcase != "0")
-				corecpp::throws<corecpp::value_error>("boolean expected");
+				corecpp::throws<std::ios_base::failure>("boolean expected");
 		}
 		void deserialize(int8_t& value)
 		{
@@ -628,8 +638,13 @@ namespace corecpp
 		{
 			for (const char* parameter = m_line.peek();
 				parameter[0] && parameter[0] != '-';
-				)
+				/* parameter = m_line.peek() ? */)
 			{
+				if (!parameter[0])
+				{
+					m_line.read();
+					continue;
+				}
 				value.emplace_back();
 				deserialize(value.back());
 			}

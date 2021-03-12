@@ -110,24 +110,29 @@ namespace corecpp
 		mutable std::vector<std::string> m_errors;
 		mutable uint32_t m_current_test_index;
 
+		template <typename T>
+		void register_failure(const T& actual, const T& expected) const
+		{
+			std::ostringstream oss;
+			corecpp::json::serializer serializer { oss };
+
+			if (m_result < test_result::FAILURE)
+				m_result = test_result::FAILURE;
+			oss << "Error at index " << m_current_test_index <<  ": " << "actual: ";
+			serializer.serialize(actual);
+			oss << "\texpected:";
+			serializer.serialize(expected);
+			logger().fail(oss.str(), __FILE__, __LINE__);
+			m_errors.emplace_back(oss.str());
+		}
+
 		template <typename T, template<typename U> class Op>
 		void assert_op(const T& actual, const T& expected) const
 		{
 			Op<T> op;
 			bool res = op(actual, expected);
 			if (!res)
-			{
-				std::ostringstream oss;
-				corecpp::json::serializer serializer { oss };
-
-				if (m_result < test_result::FAILURE)
-					m_result = test_result::FAILURE;
-				oss << "Error at index " << m_current_test_index <<  ": " << "actual: ";
-				serializer.serialize(actual);
-				oss << "\texpected:";
-				serializer.serialize(expected);
-				m_errors.emplace_back(oss.str());
-			}
+				register_failure(actual, expected);
 		}
 
 		template <typename T, template<typename U> class Op>
@@ -138,10 +143,16 @@ namespace corecpp
 			if (!res)
 			{
 				std::ostringstream oss;
+				corecpp::json::serializer serializer { oss };
 				if (m_result < test_result::FATAL)
 					m_result = test_result::FATAL;
-				oss << "Fatal at index " << m_current_test_index <<  ": " <<"actual: " << actual << "\texpected:" << expected;
+				oss << "Fatal at index " << m_current_test_index <<  ": " << "actual: ";
+				serializer.serialize(actual);
+				oss << "\texpected:";
+				serializer.serialize(expected);
+				logger().fatal(oss.str(), __FILE__, __LINE__);
 				m_errors.emplace_back(oss.str());
+
 				corecpp::throws<assertion_error>(oss.str());
 			}
 		}
@@ -149,6 +160,8 @@ namespace corecpp
 	protected:
 		using test_function = std::function<test_case_result(void)>;
 		using tests_type = std::map<std::string, test_function>;
+
+		static corecpp::diagnostic::event_producer& logger();
 
 		template <typename T>
 		void assert_equal(const T& actual, const T& expected) const
@@ -211,6 +224,20 @@ namespace corecpp
 		{
 			assert_fatal<T, std::less_equal>(actual, expected);
 		}
+		template <typename ExceptionT>
+		void assert_throws(std::function<void(void)> f) const
+		{
+			try {
+				f();
+				register_failure<std::string>("no exception thrown", "exception thrown");
+			}
+			catch(const ExceptionT&)
+			{}
+			catch(...)
+			{
+				register_failure<std::string>("wrong exception thrown", "another type of exception");
+			}
+		}
 
 		template <typename TestCaseT>
 		test_case_result run(const TestCaseT& tests, std::function<void(const typename TestCaseT::test_type&)> fn) const
@@ -221,6 +248,7 @@ namespace corecpp
 			for (const auto& test : tests)
 			{
 				try {
+					logger().info("Running test ", std::to_string(m_current_test_index) , __FILE__, __LINE__);
 					fn(test);
 				}
 				catch(const assertion_error& ae)
@@ -232,6 +260,7 @@ namespace corecpp
 
 					m_result = test_result::EXCEPT;
 					oss << "Exception at test " << m_current_test_index <<  ": " << e.what();
+					logger().error(oss.str(), __FILE__, __LINE__);
 					m_errors.emplace_back(oss.str());
 				}
 				++m_current_test_index;
@@ -338,14 +367,14 @@ namespace corecpp
 		{
 			command_line command { argc, argv };
 			command_line_parser parser { command };
-			bool help;
+			diagnostic::diagnostic_level dbg_lvl = diagnostic::diagnostic_level::fatal;
+			bool help = false;
 
 			std::cout << "\nSuite " << m_name << "\n" << std::string(m_name.length() + 6, '=')  << "\n\n";
 
-			/* diagnostic::manager::default_channel().set_level(diagnostic::diagnostic_level::debug); */
 			parser.add_option('v', "verbose", "activate verbose mode", m_verbose);
 			parser.add_option('h', "help", "show help message", help);
-			/* TODO: Add debug level option */
+			parser.add_option('d', "debug", "debug level [default:info]", dbg_lvl);
 			for (const auto& f : m_fixtures)
 			{
 				parser.add_command(f.first,
@@ -354,7 +383,17 @@ namespace corecpp
 						return run_fixture(f.first, *f.second);
 					});
 			}
-			parser.parse_options();
+
+			try
+			{
+				parser.parse_options();
+				diagnostic::manager::default_channel().set_level(dbg_lvl);
+			} catch (const std::exception& e)
+			{
+				std::cout << e.what() << std::endl;
+				parser.usage();
+				return EXIT_FAILURE;
+			}
 
 			if (help)
 			{
@@ -377,6 +416,15 @@ namespace corecpp
 			return res;
 		}
 	};
+
+
+corecpp::diagnostic::event_producer& test_fixture::logger()
+{
+	static auto& channel = corecpp::diagnostic::manager::get_channel("test_fixture");
+	static auto logger = corecpp::diagnostic::event_producer(channel);
+	return logger;
+}
+
 }
 
 #endif

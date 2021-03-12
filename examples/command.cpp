@@ -66,7 +66,16 @@ int divise(corecpp::command_line& line)
 		division.usage();
 		return EXIT_SUCCESS;
 	}
-	division.parse_parameters();
+
+	try
+	{
+		division.parse_parameters();
+	}
+	catch(const std::invalid_argument& e)
+	{
+		std::cerr << "Invalid argument: " << e.what() << std::endl;
+		return EXIT_FAILURE;
+	}
 
 	std::cout << "result is " << (float)a / (float)b << std::endl;
 
@@ -90,7 +99,15 @@ int main(int argc, char** argv)
 		corecpp::program_command { "div", "Divide 2 values then write the result", divise }
 	);
 
-	commands.parse_options();
+	try
+	{
+		commands.parse_options();
+	}
+	catch(const std::invalid_argument& e)
+	{
+		std::cerr << "Invalid argument: " << e.what() << std::endl;
+		return EXIT_FAILURE;
+	}
 
 	if (verbosity >= 3)
 		corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::debug);
@@ -112,6 +129,6 @@ int main(int argc, char** argv)
 		return ret_code;
 
 	commands.usage();
-	return EXIT_SUCCESS;
+	return EXIT_FAILURE;
 };
 

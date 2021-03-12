@@ -32,6 +32,8 @@ namespace corecpp
 	 */
 	class option_reader
 	{
+	protected:
+		static corecpp::diagnostic::event_producer& logger();
 	public:
 		/**
 		 * \brief say if the reader accepts the value to be an empty string
@@ -59,14 +61,17 @@ namespace corecpp
 		{}
 		void read(short_option_parser& parser) const override
 		{
+			logger().debug("reading ...", __FILE__, __LINE__);
 			parser.deserialize(m_value);
 		}
 		void read(long_option_parser& parser) const override
 		{
+			logger().debug("reading ...", __FILE__, __LINE__);
 			parser.deserialize(m_value);
 		}
 		void read(argument_parser& parser) const override
 		{
+			logger().debug("reading ...", __FILE__, __LINE__);
 			parser.deserialize(m_value);
 		}
 	};
@@ -84,16 +89,19 @@ namespace corecpp
 		{}
 		void read([[maybe_unused]]short_option_parser& parser) const override
 		{
+			logger().debug("reading ...", __FILE__, __LINE__);
 			// In short form, boolean is set to true if the parameter is present.
 			// No more parsing is required
 			m_value = true;
 		};
 		void read(long_option_parser& parser) const override
 		{
+			logger().debug("reading ...", __FILE__, __LINE__);
 			parser.deserialize(m_value);
 		}
 		void read(argument_parser& parser) const override
 		{
+			logger().debug("reading ...", __FILE__, __LINE__);
 			parser.deserialize(m_value);
 		}
 	};
@@ -170,10 +178,10 @@ namespace corecpp
 			{
 				m_reader->read(parser);
 			}
-			catch (corecpp::value_error& e)
+			catch (std::ios_base::failure& e)
 			{
-				corecpp::throws<std::invalid_argument>(
-					corecpp::concat<std::string>({ std::to_string(m_shortname), " : ", e.what() }));
+				corecpp::throws<corecpp::format_error>(
+					corecpp::concat<std::string>({ "invalid value for option '", std::string(1, m_shortname), "' : ", e.what() }));
 			}
 		}
 		void read(long_option_parser& parser) const
@@ -182,10 +190,10 @@ namespace corecpp
 			{
 				m_reader->read(parser);
 			}
-			catch (corecpp::value_error& e)
+			catch (std::ios_base::failure& e)
 			{
-				corecpp::throws<std::invalid_argument>(
-					corecpp::concat<std::string>({ m_name, " : ", e.what() }));
+				corecpp::throws<corecpp::format_error>(
+					corecpp::concat<std::string>({ "invalid value for option '", m_name, "' : ", e.what() }));
 			}
 		};
 		std::string helpmsg() const
@@ -315,9 +323,9 @@ namespace corecpp
 		}
 
 		template <typename T>
-		void add_param(const std::string& name, const std::string& helpmsg, T&& value)
+		void add_param(const std::string& name, const std::string& helpmsg, T&& value, bool optional = false)
 		{
-			add_param(program_parameter { name, helpmsg, std::forward<T>(value) } );
+			add_param(program_parameter { name, helpmsg, std::forward<T>(value), optional } );
 		}
 		void add_param(program_parameter&& param)
 		{
@@ -343,6 +351,7 @@ namespace corecpp
 		int execute();
 		void parse_parameters(void);
 	};
+
 }
 
 #endif

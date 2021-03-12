@@ -1,5 +1,7 @@
 #include <cstring>
 #include <iostream>
+#include <array>
+
 #include <corecpp/diagnostic.h>
 #include <corecpp/cli/command_line.h>
 //#include <corecpp/meta/validator.h>
@@ -14,15 +16,40 @@ class test_option final : public test_fixture
 				decltype(TestT::expected)& actual) const
 	{
 		actual = decltype(TestT::expected) { }; // reset the value to avoid side effects between tests
+
 		if (t.arg.length() == 1)
 		{
 			assert_equal(option.match(t.arg[0]), t.match);
 			if (t.match)
 			{
-				const char* argv[2] = { "test", t.value.c_str() };
-				command_line line { 2, const_cast<char**>(argv) }; // ugly, I know
+				/* split the given string after making a copy of it
+				 * this reflect the fact that separate strings are separate parameters
+				 */
+				const char* progname = "test";
+				std::vector<const char*> argv { progname };
+				std::locale l = std::locale();
+				std::string value = t.value;
+				std::string::iterator it = value.begin();
+				while (true)
+				{
+					argv.emplace_back(it.operator->());
+					while (it != value.end() && !std::isspace(*it, l))
+						++it;
+					if (it == value.end())
+						break;
+					*it = '\0';
+					++it;
+					if (it == value.end())
+						break;
+				};
+
+				command_line line { static_cast<int>(argv.size()), const_cast<char**>(argv.data()) }; // ugly, I know
 				short_option_parser p { line };
-				option.read(p);
+				logger().trace(corecpp::concat<std::string>({"short option"}), __FILE__, __LINE__);
+				if (t.should_throw)
+					assert_throws<corecpp::format_error>([&] { option.read(p); });
+				else
+					option.read(p);
 			}
 		}
 		else
@@ -31,10 +58,16 @@ class test_option final : public test_fixture
 			if (t.match)
 			{
 				long_option_parser p { t.value };
-				option.read(p);
+				logger().trace(corecpp::concat<std::string>({"long option"}), __FILE__, __LINE__);
+				if (t.should_throw)
+					assert_throws<corecpp::format_error>([&] { option.read(p); });
+				else
+					option.read(p);
 			}
 		}
-		assert_equal(actual, t.expected);
+		if (!t.should_throw)
+			assert_equal(actual, t.expected);
+		// else actual is undefined
 	}
 
 	test_case_result test_int() const
@@ -42,18 +75,19 @@ class test_option final : public test_fixture
 		struct test {
 			std::string arg;
 			std::string value;
+			bool should_throw;
 			bool match;
 			int expected;
 		};
 		test_cases<test> tests ({
-			{ "i", "1", true, 1 },
-			{ "int", "2", true, 2 },
-			{ "i", "aaa", true, 0 },
-			{ "int", "aaa", true, 0 },
-			{ "int", "-1", true, -1 },
-			{ "anint", "-1", false, 0 },
-			{ "", "-1", false, 0 },
-			{ "1", "i", false, 0 },
+			{ "i", "1", false, true, 1 },
+			{ "int", "2", false, true, 2 },
+			{ "i", "aaa", true, true, 0 },
+			{ "int", "aaa", true, true, 0 },
+			{ "int", "-1", false, true, -1 },
+			{ "anint", "-1", false, false, 0 },
+			{ "", "-1", false, false, 0 },
+			{ "1", "i", false, false, 0 },
 		});
 
 		return run(tests, [&](const test& t){
@@ -68,21 +102,22 @@ class test_option final : public test_fixture
 		struct test {
 			std::string arg;
 			std::string value;
+			bool should_throw;
 			bool match;
 			bool expected;
 		};
 
 		test_cases<test> tests ({
-			{ "b", "", true, true },
-			{ "b", "1", true, true },
-			{ "b", "0", true, true },
-			{ "a_bool", "false", true, false },
-			{ "a_bool", "aaa", true, false },
-			{ "a_bool", "", true, true },
-			{ "i", "", false, false },
-			{ "i", "true", false, false },
-			{ "unknown", "", false, false },
-			{ "unknown", "true", false, false },
+			{ "b", "", false, true, true },
+			{ "b", "1", false, true, true },
+			{ "b", "0", false, true, true },
+			{ "a_bool", "false", false, true, false },
+			{ "a_bool", "aaa", true, true, false },
+			{ "a_bool", "", false, true, true },
+			{ "i", "", false, false, false },
+			{ "i", "true", false, false, false },
+			{ "unknown", "", false, false, false },
+			{ "unknown", "true", false, false, false },
 		});
 
 		return run(tests, [&](const test& t){
@@ -97,21 +132,23 @@ class test_option final : public test_fixture
 		struct test {
 			std::string arg;
 			std::string value;
+			bool should_throw;
 			bool match;
 			std::string expected;
 		};
 
 		test_cases<test> tests ({
-			{ "s", "", true, "" },
-			{ "s", "1", true, "1" },
-			{ "s", "0", true, "0" },
-			{ "str", "false", true, "false" },
-			{ "str", "aaa", true, "aaa" },
-			{ "str", "", true, "" },
-			{ "i", "", false, "" },
-			{ "i", "true", false, "" },
-			{ "unknown", "", false, "" },
-			{ "unknown", "true", false, "" },
+			{ "s", "", false, true, "" },
+			{ "s", "1", false, true, "1" },
+			{ "s", "0", false, true, "0" },
+			{ "str", "false", false, true, "false" },
+			{ "str", "aaa", false, true, "aaa" },
+			{ "str", "", false, true, "" },
+			{ "i", "", false, false, "" },
+			{ "i", "true", false, false, "" },
+			{ "unknown", "", false, false, "" },
+			{ "unknown", "true", false, false, "" },
+			/* TODO: add locale testing */
 		});
 
 		return run(tests, [&](const test& t){
@@ -126,22 +163,24 @@ class test_option final : public test_fixture
 		struct test {
 			std::string arg;
 			std::string value;
+			bool should_throw;
 			bool match;
 			std::vector<int> expected;
 		};
 
 		test_cases<test> tests ({
-			{ "v", "", true, { } },
-			{ "v", "1", true, { } },
-			{ "v", "1 2 3", true, { 1, 2, 3 } },
-			{ "v", "1 a 3", true, { } },
-			{ "vector", "", true, { } },
-			{ "vector", "1", true, { } },
-			{ "vector", "1,2,3", true, { 1, 2, 3 } },
-			{ "i", "", false, { } },
-			{ "i", "true", false, { } },
-			{ "unknown", "", false, { } },
-			{ "unknown", "true", false, { } },
+			{ "v",       "",      false, true,  { } },
+			{ "v",       "1",     false, true,  { 1 } },
+			{ "v",       "1 2 3", false, true,  { 1, 2, 3 } },
+			{ "v",       "1 a 3", true,  true,  { 1 } },
+			{ "vector",  "",      true,  true,  { } },
+			{ "vector",  "1",     false, true,  { 1 } },
+			{ "vector",  "1,2,3", false, true,  { 1, 2, 3 } },
+			{ "vector",  "1,a,3", true,  true,  { 1 } },
+			{ "i",       "",      false, false, { } },
+			{ "i",       "true",  false, false, { } },
+			{ "unknown", "",      false, false, { } },
+			{ "unknown", "true",  false, false, { } },
 		});
 
 		return run(tests, [&](const test& t){
@@ -158,9 +197,9 @@ public:
 		 * Add tests for utf8 & co
 		 */
 		return {
-			{ "test_int", [&] () { return test_int(); } },
+			{ "test_int",  [&] () { return test_int(); } },
 			{ "test_bool", [&] () { return test_bool(); } },
-			{ "test_str", [&] () { return test_str(); } },
+			{ "test_str",  [&] () { return test_str(); } },
 			{ "test_vector", [&] () { return test_vector(); } },
 		};
 	}
@@ -168,26 +207,81 @@ public:
 
 class test_parser final : public test_fixture
 {
-	test_case_result test_params() const
+	test_case_result test_options() const
 	{
 		struct test {
+			int expected_a;
+			int expected_b;
+			int expected_c;
+			bool expected_d;
 			int argc;
-			char** argv;
-			bool match;
-			int expected;
+			std::vector<char const *> argv;
 		};
+
 		test_cases<test> tests ({
+			{ 0, 0, 0, false, 0, { "" } },
+			{ 0, 0, 0, false, 1, { "program" } },
+			{ 1, 0, 0, false, 2, { "program", "--an-option=1" } },
+			{ -1, 0, 0, false, 3, { "program", "-a", "-1" } },
+			{ 2, 0, 0, false, 4, { "program", "--an-option=1", "-a", "2" } },
+			{ 1, 2, 0, false, 4, { "program", "--an-option=1", "-b", "2" } },
+			{ 0, 2, 3, false, 4, { "program", "-c", "3", "--option-b=2" } },
+			{ 2, 0, 3, false, 5, { "program", "-c", "3", "-a", "2" } },
+			{ 0, 0, 0, true, 2, { "program", "--deep-option" } },
+			{ 0, 2, 0, true, 3, { "program", "--deep-option", "--option-b=2" } },
 		});
 
 		return run(tests, [&](const test& t){
-			/* TODO */
+			int a = 0, b = 0, c = 0;
+			bool d = false;
+			command_line line { t.argc, const_cast<char**>(t.argv.data()) }; /* const_cast required due to C API */
+			command_line_parser parser { line };
+			parser.add_options(
+				program_option {'a', "an-option", "The option A", a },
+				program_option {'b', "option-b", "The option B", b },
+				program_option {'c', "option-c", "The option C", c },
+				program_option {"deep-option", "The option D", d });
+			parser.parse_options();
+			assert_equal(a, t.expected_a);
+			assert_equal(b, t.expected_b);
+			assert_equal(c, t.expected_c);
+			assert_equal(d, t.expected_d);
 		});
 	}
+
+	test_case_result test_params() const
+	{
+		struct test {
+			int expected;
+			int argc;
+			std::vector<char const *> argv;
+		};
+
+		test_cases<test> tests ({
+			{ 0, 1, { "program" } },
+			{ 1, 2, { "program", "1" } },
+			{ 2, 4, { "program","-a", "1", "2" } },
+			{ 3, 3, { "program","--an-option=1", "3" } },
+		});
+
+		return run(tests, [&](const test& t){
+			int a = 0, value = 0;
+			command_line line { t.argc, const_cast<char**>(t.argv.data()) }; /* const_cast required due to C API */
+			command_line_parser parser { line };
+			parser.add_option('a', "an-option", "The option A", a);
+			parser.add_param("value", "the value", value, true);
+			parser.parse_options();
+			parser.parse_parameters();
+			assert_equal(value, t.expected);;
+		});
+	}
+
 public:
 	tests_type tests() const override
 	{
 		return {
-			{ "test_params", [&] () { return test_params(); } },
+			{ "test_options_parser", [&] () { return test_options(); } },
+			{ "test_params_parser", [&] () { return test_params(); } },
 		};
 	}
 };

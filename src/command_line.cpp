@@ -11,16 +11,40 @@
 namespace corecpp
 {
 
-corecpp::diagnostic::event_producer& command_line::logger()
+corecpp::diagnostic::event_producer& long_option_parser::logger()
 {
-	static auto& channel = corecpp::diagnostic::manager::get_channel("command_line");
+	static auto& channel = corecpp::diagnostic::manager::get_channel("cli::long_option_parser");
 	static auto logger = corecpp::diagnostic::event_producer(channel);
 	return logger;
 }
 
+corecpp::diagnostic::event_producer& short_option_parser::logger()
+{
+	static auto& channel = corecpp::diagnostic::manager::get_channel("cli::long_option_parser");
+	static auto logger = corecpp::diagnostic::event_producer(channel);
+	return logger;
+}
+
+
+corecpp::diagnostic::event_producer& option_reader::logger()
+{
+	static auto& channel = corecpp::diagnostic::manager::get_channel("cli::option_reader");
+	static auto logger = corecpp::diagnostic::event_producer(channel);
+	return logger;
+}
+
+
+corecpp::diagnostic::event_producer& command_line::logger()
+{
+	static auto& channel = corecpp::diagnostic::manager::get_channel("cli::command_line");
+	static auto logger = corecpp::diagnostic::event_producer(channel);
+	return logger;
+}
+
+
 corecpp::diagnostic::event_producer& command_line_parser::logger()
 {
-	static auto& channel = corecpp::diagnostic::manager::get_channel("command_line_parser");
+	static auto& channel = corecpp::diagnostic::manager::get_channel("cli::command_line_parser");
 	static auto logger = corecpp::diagnostic::event_producer(channel);
 	return logger;
 }
@@ -32,7 +56,6 @@ void command_line_parser::parse_options(void)
 		if (*token != '-')
 			break;
 		std::string param(m_command_line.read());
-		logger().trace(corecpp::concat<std::string>({"parsing ", param}), __FILE__, __LINE__);
 		if (param.substr(0,2) == "--")
 		{
 			std::string value = "";
@@ -44,9 +67,10 @@ void command_line_parser::parse_options(void)
 			}
 			else
 			{
-				value = param.substr(pos);
-				param = param.substr(2, param.length() - 2 - pos);
+				value = param.substr(pos+1);
+				param = param.substr(2, pos - 2);
 			}
+			logger().trace(corecpp::concat<std::string>({"parsing ", param, " [", value, "]"}), __FILE__, __LINE__);
 			auto option = get_option(param);
 			if (option == m_options.end())
 				throw std::invalid_argument(param);
@@ -56,6 +80,7 @@ void command_line_parser::parse_options(void)
 		else if (param[0] == '-')
 		{
 			param = param.substr(1);
+			logger().trace(corecpp::concat<std::string>({"parsing ", param}), __FILE__, __LINE__);
 			const char* value = m_command_line.peek();
 			if(value && *value == '-') //another option
 				value = nullptr;
@@ -129,7 +154,8 @@ void command_line_parser::parse_parameters(void)
 		if (m_command_line.peek() != nullptr)
 			parameter.read(parser);
 		else if (parameter.is_required())
-			corecpp::throws<value_error>(parameter.name());
+			corecpp::throws<std::invalid_argument>(
+				corecpp::concat<std::string>({ parameter.name(), " is required." }));
 	}
 }
 

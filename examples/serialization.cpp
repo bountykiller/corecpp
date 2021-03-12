@@ -89,7 +89,7 @@ struct complex_type
 		else if (property == "name")
 			d.deserialize(symbol);
 		else
-			throw std::runtime_error(corecpp::concat<std::string>({"invalid property ", property}));
+			corecpp::throws<std::runtime_error>(corecpp::concat<std::string>({"invalid property ", property}));
 	}
 };
 
