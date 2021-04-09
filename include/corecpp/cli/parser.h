@@ -425,7 +425,7 @@ namespace corecpp
 		void read_array(ValueT& value)
 		{
 			for (const char* parameter = m_line.peek();
-				parameter && parameter[0] != '-';
+				parameter && (parameter[0] != '-' || parameter[1] != '-' || parameter[2]);
 				parameter = m_line.peek())
 			{
 				if (!parameter[0])
@@ -637,8 +637,8 @@ namespace corecpp
 		void read_array(ValueT& value)
 		{
 			for (const char* parameter = m_line.peek();
-				parameter[0] && parameter[0] != '-';
-				/* parameter = m_line.peek() ? */)
+				parameter && (parameter[0] != '-' || parameter[1] != '-' || parameter[2]);
+				parameter = m_line.peek())
 			{
 				if (!parameter[0])
 				{

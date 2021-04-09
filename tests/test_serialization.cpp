@@ -91,20 +91,6 @@ std::ostream& operator << (std::ostream& oss, const complex& e)
 	return oss << e.real << "+" << e.imag << "i";
 }
 
-/*
- * HACK
- */
-namespace std
-{
-	std::ostream& operator << (std::ostream& oss, const std::vector<int>& v)
-	{
-		oss << "{ ";
-		for (int i : v)
-			oss << i << " ";
-		return oss << "}";
-	}
-};
-
 class test_json_serialization final : public test_fixture
 {
 	template<typename T>

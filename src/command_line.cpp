@@ -58,6 +58,8 @@ void command_line_parser::parse_options(void)
 		std::string param(m_command_line.read());
 		if (param.substr(0,2) == "--")
 		{
+			if (param.length() == 2)
+				break; /* seeing -- on the command line means we have no more options to read */
 			std::string value = "";
 			auto pos = param.find('=');
 			if(pos == std::string::npos)
@@ -147,10 +149,6 @@ void command_line_parser::parse_parameters(void)
 	argument_parser parser { m_command_line };
 	for (const auto& parameter : m_params)
 	{
-		 /* read the token from the command line.
-		  * won't work for booleans
-		  * ==> make a cli directory, move stuff there, put parsers in a separate file and create a parameter parser
-		  */
 		if (m_command_line.peek() != nullptr)
 			parameter.read(parser);
 		else if (parameter.is_required())

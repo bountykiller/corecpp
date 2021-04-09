@@ -85,6 +85,8 @@ class test_option final : public test_fixture
 			{ "i", "aaa", true, true, 0 },
 			{ "int", "aaa", true, true, 0 },
 			{ "int", "-1", false, true, -1 },
+			{ "into", "1", false, false, 0 },
+			{ "in", "1", false, false, 0 },
 			{ "anint", "-1", false, false, 0 },
 			{ "", "-1", false, false, 0 },
 			{ "1", "i", false, false, 0 },
@@ -173,10 +175,13 @@ class test_option final : public test_fixture
 			{ "v",       "1",     false, true,  { 1 } },
 			{ "v",       "1 2 3", false, true,  { 1, 2, 3 } },
 			{ "v",       "1 a 3", true,  true,  { 1 } },
+			{ "v",       "1 2 -- 3", false, true,  { 1, 2 } },
+
 			{ "vector",  "",      true,  true,  { } },
 			{ "vector",  "1",     false, true,  { 1 } },
 			{ "vector",  "1,2,3", false, true,  { 1, 2, 3 } },
 			{ "vector",  "1,a,3", true,  true,  { 1 } },
+
 			{ "i",       "",      false, false, { } },
 			{ "i",       "true",  false, false, { } },
 			{ "unknown", "",      false, false, { } },
@@ -229,6 +234,11 @@ class test_parser final : public test_fixture
 			{ 2, 0, 3, false, 5, { "program", "-c", "3", "-a", "2" } },
 			{ 0, 0, 0, true, 2, { "program", "--deep-option" } },
 			{ 0, 2, 0, true, 3, { "program", "--deep-option", "--option-b=2" } },
+
+			{ 0, 0, 0, false, 3, { "program", "1", "2" } },
+			{ 0, 0, 0, false, 4, { "program", "--", "1", "2" } },
+			{ 0, 0, 0, false, 3, { "program", "--", "-d" } },
+			{ 0, 0, 0, false, 3, { "program", "--", "--deep-option" } },
 		});
 
 		return run(tests, [&](const test& t){
@@ -252,27 +262,62 @@ class test_parser final : public test_fixture
 	test_case_result test_params() const
 	{
 		struct test {
-			int expected;
 			int argc;
 			std::vector<char const *> argv;
+			std::vector<int> expected;
 		};
 
 		test_cases<test> tests ({
-			{ 0, 1, { "program" } },
-			{ 1, 2, { "program", "1" } },
-			{ 2, 4, { "program","-a", "1", "2" } },
-			{ 3, 3, { "program","--an-option=1", "3" } },
+			{ 1, { "program" }, {} },
+			{ 2, { "program", "1" }, { 1 } },
+			{ 3, { "program", "1", "2" }, { 1, 2 } },
+			{ 4, { "program", "0", "2", "-3" }, { 0, 2, -3 } },
+
+			{ 3, { "program","-a", "1" }, { } },
+			{ 4, { "program","-a", "1", "2" }, { 2 } },
+			{ 5, { "program","-a", "1", "2", "-3" }, { 2, -3 } },
+
+			{ 2, { "program","--an-option=1" }, { } },
+			{ 3, { "program","--an-option=1", "3" }, { 3 } },
+			{ 4, { "program","--an-option=1", "3", "5" }, { 3, 5 } },
+
+			{ 3, { "program","-b", "--an-option=2" }, { } },
+			{ 4, { "program","-b", "--an-option=2", "4" }, { 4 } },
+			{ 8,
+				{ "program","-b", "--an-option=2", "4", "0", "666", "007", "8" },
+				{ 4, 0, 666, 7, 8 }
+			},
+			{ 9,
+				{ "program","-b", "--an-option=2", "--", "-4", "0", "-666", "007", "8" },
+				{ -4, 0, -666, 7, 8 }
+			},
+			{ 9,
+				{ "program","-b", "--an-option=2", "4", "0", "-666", "007", "8", "--" },
+				{ 4, 0, -666, 7, 8 }
+			},
+			{ 9,
+				{ "program","-b", "--", "4", "0", "-666", "007", "8", "--" },
+				{ 4, 0, -666, 7, 8 }
+			},
+
+			{ 3, { "program","-b", "" }, { } },
+			{ 3, { "program","-b", "NaN" }, { 0 } },
+			{ 5, { "program","-b", "0", "", "1" }, { 0, 1 } },
+			{ 5, { "program","-b", "0", "NaN", "1" }, { 0, 0, 1 } },
 		});
 
 		return run(tests, [&](const test& t){
-			int a = 0, value = 0;
+			int a = 0;
+			bool b;
+			std::vector<int> value = {};
 			command_line line { t.argc, const_cast<char**>(t.argv.data()) }; /* const_cast required due to C API */
 			command_line_parser parser { line };
 			parser.add_option('a', "an-option", "The option A", a);
+			parser.add_option('b', "another-option", "The option A", b);
 			parser.add_param("value", "the value", value, true);
 			parser.parse_options();
 			parser.parse_parameters();
-			assert_equal(value, t.expected);;
+			assert_equal(value, t.expected);
 		});
 	}
 
