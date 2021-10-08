@@ -2,20 +2,22 @@
 #define CORECPP_JSON_H
 
 #include <codecvt>
+#include <cwchar>
 #include <functional>
 #include <iterator>
-#include <locale>
-#include <sstream>
 #include <iostream>
+#include <locale>
+#include <optional>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <vector>
 #include <stdexcept>
-#include <cwchar>
 
 #include <corecpp/algorithm.h>
 #include <corecpp/diagnostic.h>
 #include <corecpp/variant.h>
+#include <corecpp/visibility.h>
 #include <corecpp/except.h>
 #include <corecpp/serialization/common.h>
 
@@ -23,6 +25,7 @@ namespace corecpp
 {
 	namespace json
 	{
+		_internal  corecpp::diagnostic::event_producer& json_logger();
 		struct open_brace_token
 		{};
 
@@ -309,19 +312,24 @@ namespace corecpp
 			node end();
 		};
 
-		/* TODO:
-		 * Add pretty printf managment
-		 */
 		class serializer
 		{
 			std::ostream& m_stream;
+			bool m_pretty;
 			bool m_first = true;
 			void convert_and_escape(const std::string& value);
 			void convert_and_escape(const std::wstring& value);
 			void convert_and_escape(const std::u16string& value);
 			void convert_and_escape(const std::u32string& value);
+			unsigned int m_indent_level;
+			void indent()
+			{
+				for (int i = 0; i < m_indent_level; ++i)
+					m_stream << "\t";
+			}
 		public:
-			serializer(std::ostream& s) : m_stream(s)
+			serializer(std::ostream& s, bool pretty = false)
+			: m_stream(s), m_pretty(pretty)
 			{}
 			void serialize(bool value)
 			{
@@ -424,11 +432,31 @@ namespace corecpp
 			template <typename ValueT>
 			void begin_object()
 			{
+//				abi::__cxa_demangle
+				json_logger().trace("begin object", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 				m_first = true;
+				if (m_pretty)
+				{
+					m_stream << '\n';
+					indent();
+				}
 				m_stream << '{';
+				if (m_pretty)
+				{
+					m_stream << '\n';
+					m_indent_level++;
+					indent();
+				}
 			}
 			void end_object()
 			{
+				json_logger().trace("end object", __FILE__, __LINE__);
+				if (m_pretty)
+				{
+					m_stream << '\n';
+					m_indent_level--;
+					indent();
+				}
 				m_stream << '}';
 			}
 
@@ -447,7 +475,7 @@ namespace corecpp
 			void write_element(ValueT&& value)
 			{
 				if (!m_first)
-					m_stream << ',';
+					m_stream << (m_pretty ? ", " : ",");
 				serialize(std::forward<ValueT>(value));
 				m_first = false;
 			}
@@ -455,7 +483,7 @@ namespace corecpp
 			void write_element(const ValueT& value)
 			{
 				if (!m_first)
-					m_stream << ',';
+					m_stream << (m_pretty ? ", " : ",");
 				serialize(value);
 				m_first = false;
 			}
@@ -464,7 +492,14 @@ namespace corecpp
 			void write_property(const StringT& name, ValueT&& value)
 			{
 				if (!m_first)
+				{
 					m_stream << ',';
+					if (m_pretty)
+					{
+						m_stream << '\n';
+						indent();
+					}
+				}
 				serialize(name);
 				m_stream << ':';
 				serialize(value);
@@ -474,7 +509,13 @@ namespace corecpp
 			void write_property_cb(const StringT& name, FuncT func)
 			{
 				if (!m_first)
+				{
 					m_stream << ',';
+					{
+						m_stream << '\n';
+						indent();
+					}
+				}
 				serialize(name);
 				m_stream << ':';
 				func();
@@ -511,19 +552,27 @@ namespace corecpp
 			template <typename ValueT>
 			void write_associative_array(ValueT&& value)
 			{
+				json_logger().trace("begin associative_array", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 				begin_array<ValueT>();
 				for (typename std::decay_t<ValueT>::const_iterator iter = std::cbegin(value);
 					iter != std::cend(value);
 					++iter)
 				{
 					if (!m_first)
+					{
 						m_stream << ',';
+						{
+							m_stream << '\n';
+							indent();
+						}
+					}
 					begin_object<typename std::decay_t<ValueT>::value_type>();
 					write_element<typename std::decay_t<ValueT>::key_type>(iter->first);
 					write_element<typename std::decay_t<ValueT>::mapped_type>(iter->second);
 					end_object();
 				}
 				end_array();
+				json_logger().trace("end associative_array", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 			}
 		};
 
@@ -666,41 +715,41 @@ namespace corecpp
 			template <typename ValueT>
 			void begin_object()
 			{
-				read();
 				m_first = true;
 				if (m_current.index() != token::index_of<open_brace_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(m_current) }));
+				read();
 			}
 			void end_object()
 			{
-				read();
 				if (m_current.index() != token::index_of<close_brace_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace token expected, got ", to_string(m_current) }));
+				read();
 			}
 
 			template <typename ValueT>
 			void begin_array()
 			{
-				read();
 				m_first = true;
 				if (m_current.index() != token::index_of<open_bracket_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open bracket token expected, got ", to_string(m_current) }));
+				read();
 			}
 			void end_array()
 			{
-					read();
 				m_first = false;
 				if (m_current.index() != token::index_of<close_bracket_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(m_current) }));
+				read();
 			}
 			template <typename ValueT>
 			void read_element(ValueT& value)
 			{
 				if (!m_first)
 				{
-					read();
 					if (m_current.index() != token::index_of<comma_token>::value)
 						corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "comma token expected, got ", to_string(m_current) }));
+					read();
 				}
 				deserialize(value);
 				m_first = false;
@@ -710,9 +759,9 @@ namespace corecpp
 			{
 				if (!m_first)
 				{
-					read();
 					if (m_current.index() != token::index_of<comma_token>::value)
 						corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "comma token expected, got ", to_string(m_current) }));
+					read();
 				}
 				func();
 				m_first = false;
@@ -720,6 +769,7 @@ namespace corecpp
 			template <typename ValueT>
 			void read_object(ValueT& value)
 			{
+				json_logger().trace("reading object", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 				if (m_current.index() != token::index_of<open_brace_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(m_current) }));
 
@@ -738,10 +788,12 @@ namespace corecpp
 				}
 				if (m_current.index() != token::index_of<close_brace_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace token expected, got ", to_string(m_current) }));
+				json_logger().trace("object read", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 			}
 			template <typename ValueT, typename PropertiesT>
 			void read_object(ValueT& value, const PropertiesT& properties)
 			{
+				json_logger().trace("reading object", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 				if (m_current.index() != token::index_of<open_brace_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(m_current) }));
 
@@ -762,9 +814,11 @@ namespace corecpp
 				}
 				if (m_current.index() != token::index_of<close_brace_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace expected, got ", to_string(m_current) }));
+				json_logger().trace("object read", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 			}
 			void read_object_cb(std::function<void(const std::wstring&)> func)
 			{
+				json_logger().trace("reading object", __FILE__, __LINE__);
 				if (m_current.index() != token::index_of<open_brace_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(m_current) }));
 
@@ -782,10 +836,12 @@ namespace corecpp
 				}
 				if (m_current.index() != token::index_of<close_brace_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace expected, got ", to_string(m_current) }));
+				json_logger().trace("object read", __FILE__, __LINE__);
 			}
 			template <typename ValueT>
 			void read_array(ValueT& value)
 			{
+				json_logger().trace("reading array", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 				if (m_current.index() != token::index_of<open_bracket_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open bracket token expected, got ", to_string(m_current) }));
 				read();
@@ -803,12 +859,15 @@ namespace corecpp
 				} while (true);
 				if (m_current.index() != token::index_of<close_bracket_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(m_current) }));
+				json_logger().trace("array read", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 			}
 			template <typename ValueT>
 			void read_associative_array(ValueT& value)
 			{
+				json_logger().trace("reading associative_array", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 				if (m_current.index() != token::index_of<open_bracket_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open bracket token expected, got ", to_string(m_current) }));
+ 				read();
 				if (m_current.index() == token::index_of<close_bracket_token>::value)
 					return; /* empty associative array */
 				do
@@ -820,16 +879,18 @@ namespace corecpp
 
 					begin_object<typename ValueT::value_type>();
 					read_element<KeyT>(key);
+					read();
 					read_element<MappedT>(mapped);
+					read();
 					end_object();
 					value.emplace(std::move(key), std::move(mapped));
-					read();
 					if (m_current.index() != token::index_of<comma_token>::value)
 						break;
 					read();
 				} while (true);
 				if (m_current.index() != token::index_of<close_bracket_token>::value)
 					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(m_current) }));
+				json_logger().trace("associative_array read", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 			}
 		};
 	}

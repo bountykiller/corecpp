@@ -100,6 +100,7 @@ void map_example(void)
 		{ 2, { rights::read, rights::write } },
 		{ 3, { rights::read } }
 	};
+
 	std::ostringstream json;
 	corecpp::json::serializer s(json);
 	s.serialize(groups_rights);
@@ -107,10 +108,10 @@ void map_example(void)
 
 	std::remove_const_t<decltype(groups_rights)> groups_rights_copy;
 	std::istringstream iss;
-	corecpp::json::deserializer d(iss);
-
 	iss.str(json.str());
+	corecpp::json::deserializer d(iss);
 	d.deserialize(groups_rights_copy);
+
 	for (const auto& group_rights : groups_rights_copy)
 	{
 		std::cout << group_rights.first << " : ";
@@ -141,7 +142,7 @@ int main(int argc, char** argv)
 		<< " (created on " << std::put_time(std::localtime(&created), "%c %Z") << ")" << std::endl;
 	std::cout << "Now serialize it!" << std::endl;
 	/* construct a serializer which will write the result on stdout */
-	corecpp::json::serializer s(std::cout);
+	corecpp::json::serializer s(std::cout, true);
 	/* now deserialize usr */
 	s.serialize(usr);
 
