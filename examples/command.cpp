@@ -1,6 +1,6 @@
 #include <iostream>
 #include <corecpp/diagnostic.h>
-#include <corecpp/command_line.h>
+#include <corecpp/cli/command_line.h>
 //#include <corecpp/meta/validator.h>
 
 int add(corecpp::command_line& line)
@@ -86,6 +86,8 @@ int main(int argc, char** argv)
 {
 	unsigned int verbosity = 0;
 	bool show_help = false;
+	std::vector<std::string> dummy {};
+
 	corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::debug);
 	corecpp::command_line args { argc, argv };
 	corecpp::command_line_parser commands { args };
@@ -98,6 +100,8 @@ int main(int argc, char** argv)
 		corecpp::program_command { "mul", "Multiply 2 values then write the result", mul },
 		corecpp::program_command { "div", "Divide 2 values then write the result", divise }
 	);
+
+	commands.add_param("dummy", "dummy parameter", dummy, true);
 
 	try
 	{
@@ -124,11 +128,16 @@ int main(int argc, char** argv)
 		return EXIT_SUCCESS;
 	}
 
-	int ret_code = commands.execute();
-	if (ret_code >= 0)
-		return ret_code;
+	auto command = commands.parse_command();
+	if (command)
+		return command();
 
-	commands.usage();
+	commands.parse_parameters();
+	if (!dummy.empty())
+		std::cout << corecpp::concat<std::string>(dummy, std::string {", " }) << std::endl;
+	else
+		commands.usage();
+
 	return EXIT_FAILURE;
 };
 

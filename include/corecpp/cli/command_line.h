@@ -345,10 +345,10 @@ namespace corecpp
 		void usage();
 		void parse_options(void);
 		/*!
-		 *\brief Will execute the command given on the command line.
-		 *\return The result of the command. If no command was specified, it returns -1
+		 *\brief Will return the command given on the command line.
+		 *\return The command. If no command was specified, it returns an empty function.
 		 */
-		int execute();
+		std::function<int()> parse_command(void);
 		void parse_parameters(void);
 	};
 

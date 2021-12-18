@@ -365,8 +365,8 @@ namespace corecpp
 
 		int run(int argc, char** argv)
 		{
-			command_line command { argc, argv };
-			command_line_parser parser { command };
+			command_line cmd_line { argc, argv };
+			command_line_parser parser { cmd_line };
 			diagnostic::diagnostic_level dbg_lvl = diagnostic::diagnostic_level::fatal;
 			bool help = false;
 
@@ -401,8 +401,9 @@ namespace corecpp
 				return EXIT_SUCCESS;
 			}
 
-			int res = parser.execute();
-			if (res < 0) /* no commands found */
+			int res;
+			auto cmd = parser.parse_command();
+			if (!cmd) /* no commands found */
 			{
 				res = EXIT_SUCCESS;
 				for (const auto& f : m_fixtures)
@@ -411,6 +412,8 @@ namespace corecpp
 						res = EXIT_FAILURE;
 				}
 			}
+			else
+				res = cmd();
 			std::cout << std::endl;
 
 			return res;

@@ -157,19 +157,20 @@ void command_line_parser::parse_parameters(void)
 	}
 }
 
-int command_line_parser::execute()
+std::function<int()> command_line_parser::parse_command(void)
 {
-	const char* command = m_command_line.read();
+	const char* command = m_command_line.peek();
 	if (!command) // all parameter have already been read
-		return -1;
+		return {};
 
 	auto cmd = get_command(command);
 	if (cmd == m_commands.end())
-		return -1;
+		return {};
 
-	logger().trace(corecpp::concat<std::string>({"calling ", command}), __FILE__, __LINE__);
+	logger().trace(corecpp::concat<std::string>({"got ", command}), __FILE__, __LINE__);
+	m_command_line.consume();
 	m_command_line.store_command();
-	return cmd->execute(m_command_line);
+	return [this, cmd]() { return cmd->execute(m_command_line); };
 }
 
 }

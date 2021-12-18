@@ -44,19 +44,25 @@ namespace corecpp
 		 */
 		const char* peek() const noexcept
 		{
-			int pos = m_pos+1;
+			int pos = m_pos + 1;
 			if (pos >= m_argc)
 				return nullptr;
 			return m_argv[pos];
 		}
+		void consume() noexcept
+		{
+			if (m_pos >= m_argc)
+				return;
+			m_pos += 1;
+		}
+
 		/**
 		 * \brief read next command line argument and advance by 1
 		 * \return the next argument as a char* (inherited from C). nullptr if no more arguments to read.
 		 */
 		const char* read() noexcept
 		{
-			m_pos += 1;
-			if (m_pos >= m_argc)
+			if (m_pos >= m_argc || ++m_pos >= m_argc)
 				return nullptr;
 			try
 			{
@@ -601,7 +607,7 @@ namespace corecpp
 		}
 		void deserialize(std::string& value)
 		{
-			corecpp::throws<corecpp::unimplemented>("");
+			value = m_line.read(); /* no further action needed as char unescaping should have been done by the shell */
 		}
 		void deserialize(std::wstring& value)
 		{
