@@ -194,9 +194,11 @@ namespace corecpp
 		value_node& object_node::emplace(StringT&& key, ValueT&& value)
 		{
 			for (auto& member : members)
+			{
 				if (member.name.value == key)
 					return (member.value = std::forward<ValueT>(value));
-				members.emplace_back(key, std::forward<ValueT>(value));
+			}
+			members.emplace_back(key, std::forward<ValueT>(value));
 			return members.back().value;
 		}
 
@@ -316,12 +318,12 @@ namespace corecpp
 		{
 			std::ostream& m_stream;
 			bool m_pretty;
-			bool m_first = true;
+			bool m_first;
+			unsigned int m_indent_level;
 			void convert_and_escape(const std::string& value);
 			void convert_and_escape(const std::wstring& value);
 			void convert_and_escape(const std::u16string& value);
 			void convert_and_escape(const std::u32string& value);
-			unsigned int m_indent_level;
 			void indent()
 			{
 				for (int i = 0; i < m_indent_level; ++i)
@@ -329,7 +331,7 @@ namespace corecpp
 			}
 		public:
 			serializer(std::ostream& s, bool pretty = false)
-			: m_stream(s), m_pretty(pretty)
+			: m_stream { s }, m_pretty { pretty }, m_first { true }, m_indent_level { 0 }
 			{}
 			void serialize(bool value)
 			{
@@ -337,39 +339,39 @@ namespace corecpp
 			}
 			void serialize(int8_t value)
 			{
-				m_stream << value;
+				m_stream << std::to_string(value);
 			}
 			void serialize(int16_t value)
 			{
-				m_stream << value;
+				m_stream << std::to_string(value);
 			}
 			void serialize(int32_t value)
 			{
-				m_stream << value;
+				m_stream << std::to_string(value);
 			}
 			void serialize(int64_t value)
 			{
-				m_stream << value;
+				m_stream << std::to_string(value);
 			}
 			void serialize(uint8_t value)
 			{
-				m_stream << value;
+				m_stream << std::to_string(value);
 			}
 			void serialize(uint16_t value)
 			{
-				m_stream << value;
+				m_stream << std::to_string(value);
 			}
 			void serialize(char16_t value)
 			{
-				m_stream << value;
+				m_stream << std::to_string(value);
 			}
 			void serialize(uint32_t value)
 			{
-				m_stream << value;
+				m_stream << std::to_string(value);
 			}
 			void serialize(uint64_t value)
 			{
-				m_stream << value;
+				m_stream << std::to_string(value);
 			}
 			void serialize(std::nullptr_t)
 			{
@@ -377,11 +379,11 @@ namespace corecpp
 			}
 			void serialize(float value)
 			{
-				m_stream << value;
+				m_stream << std::to_string(value);
 			}
 			void serialize(double value)
 			{
-				m_stream << value;
+				m_stream << std::to_string(value);
 			}
 			void serialize(const char *value)
 			{
