@@ -44,11 +44,44 @@ namespace corecpp
 		test_result value = test_result::SUCCESS;
 		std::vector<std::string> errors;
 
-		void dump_errors(std::ostream& oss)
+		void dump_errors(std::ostream& oss) const
 		{
 			for (const auto& err : errors)
 			{
 				oss << "      - " << err << "\n";
+			}
+		}
+
+		void print(bool verbose, size_t padding)
+		{
+			switch (value)
+			{
+				case test_result::SUCCESS:
+					std::cout << std::string(padding, '.')
+						<< graphic_rendition_v<sgr_p::fg_green> << "SUCCESS"
+						<< graphic_rendition_v<sgr_p::all_off> << "\n";
+					break;
+				case test_result::FAILURE:
+					std::cout << std::string(padding, '.')
+						<< graphic_rendition_v<sgr_p::fg_yellow> << "FAILURE"
+						<< graphic_rendition_v<sgr_p::all_off> << "\n";
+					if (verbose)
+						dump_errors(std::cout);
+					break;
+				case test_result::FATAL:
+					std::cout << std::string(padding, '.')
+						<< graphic_rendition_v<sgr_p::fg_red> << "FATAL"
+						<< graphic_rendition_v<sgr_p::all_off> << "\n";
+					if (verbose)
+						dump_errors(std::cout);
+					break;
+				case test_result::EXCEPT:
+					std::cout << std::string(padding, '.')
+						<< graphic_rendition_v<sgr_p::fg_red> << "!!! EXCEPTION !!!"
+						<< graphic_rendition_v<sgr_p::all_off> << "\n";
+					if (verbose)
+						dump_errors(std::cout);
+					break;
 			}
 		}
 
@@ -290,11 +323,99 @@ namespace corecpp
 			return { m_result, m_errors };;
 		}
 
+		int run(const std::string& name, test_function test, bool verbose)
+		{
+			test_case_result result;
+			size_t padding = 2;
+			if (name.length() < 48)
+				padding = 64 - name.length();
+
+			std::cout << "  Tests: " << name;
+			try
+			{
+				reset();
+				result = test();
+			}
+			catch (...)
+			{
+				result = { test_result::FATAL, { "Uncaught error" } };
+			}
+			result.print(verbose, padding);
+
+			return (result.value == test_result::SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE;
+		}
+
 	public:
 		virtual ~test_fixture()
 		{
 			if (m_setted)
 				teardown();
+		}
+
+
+		int run(const std::string& name, bool verbose)
+		{
+			int res = EXIT_SUCCESS;
+
+			setup();
+			std::cout << name << "\n" << std::string(name.length(), '-') << std::endl;
+			for (const auto& test : tests())
+			{
+				int test_res = run(test.first, test.second, verbose);
+				if (test_res == EXIT_FAILURE)
+					res = EXIT_FAILURE;
+			}
+			teardown();
+			return res;
+		}
+
+
+		int run(command_line& c, const std::string& name, bool verbose)
+		{
+			bool help = false;
+			command_line_parser parser { c };
+
+			parser.add_option('h', "help", "show help message", help);
+			for (const auto& t : tests())
+			{
+				parser.add_command(t.first, corecpp::concat<std::string>({ "Run test '", t.first, "'"}),
+					[&] ([[maybe_unused]] command_line& c)
+					{
+						setup();
+						int res = run(t.first, t.second, verbose);
+						teardown();
+						return res;
+					});
+			}
+
+			try
+			{
+				parser.parse_options();
+			}
+			catch (const std::exception& e)
+			{
+				std::cout << e.what() << std::endl;
+				parser.usage();
+				return EXIT_FAILURE;
+			}
+
+			if (help)
+			{
+				parser.usage();
+				return EXIT_SUCCESS;
+			}
+
+			int res;
+			auto cmd = parser.parse_command();
+			if (!cmd) /* no commands found */
+			{
+				res = run(name, verbose);
+			}
+			else
+				res = cmd();
+			std::cout << std::endl;
+
+			return res;
 		}
 
 		virtual void setup() { m_setted = true; }
@@ -308,66 +429,6 @@ namespace corecpp
 		bool m_verbose = false;
 		std::string m_name;
 		std::map<std::string, std::unique_ptr<test_fixture>> m_fixtures;
-
-		int run_fixture(const std::string& name, test_fixture& fixture) const
-		{
-			int res = EXIT_SUCCESS;
-			test_case_result result;
-
-			fixture.setup();
-			std::cout << name << "\n" << std::string(name.length(), '-') << std::endl;
-			for (const auto test : fixture.tests())
-			{
-				size_t padding = 2;
-				if (test.first.length() < 48)
-					padding = 64 - test.first.length();
-				std::cout << "  Tests: " << test.first;
-				try
-				{
-					fixture.reset();
-					result = test.second();
-				}
-				catch (...)
-				{
-					result = { test_result::FATAL, { "Uncaught error" } };
-				}
-
-				switch (result.value)
-				{
-					case test_result::SUCCESS:
-						std::cout << std::string(padding, '.')
-							<< graphic_rendition_v<sgr_p::fg_green> << "SUCCESS"
-							<< graphic_rendition_v<sgr_p::all_off> << "\n";
-						break;
-					case test_result::FAILURE:
-						res = EXIT_FAILURE;
-						std::cout << std::string(padding, '.')
-							<< graphic_rendition_v<sgr_p::fg_yellow> << "FAILURE"
-							<< graphic_rendition_v<sgr_p::all_off> << "\n";
-						if (m_verbose)
-							result.dump_errors(std::cout);
-						break;
-					case test_result::FATAL:
-						res = EXIT_FAILURE;
-						std::cout << std::string(padding, '.')
-							<< graphic_rendition_v<sgr_p::fg_red> << "FATAL"
-							<< graphic_rendition_v<sgr_p::all_off> << "\n";
-						if (m_verbose)
-							result.dump_errors(std::cout);
-						break;
-					case test_result::EXCEPT:
-						res = EXIT_FAILURE;
-						std::cout << std::string(padding, '.')
-							<< graphic_rendition_v<sgr_p::fg_red> << "!!! EXCEPTION !!!"
-							<< graphic_rendition_v<sgr_p::all_off> << "\n";
-						if (m_verbose)
-							result.dump_errors(std::cout);
-						break;
-				}
-			}
-			fixture.teardown();
-			return res;
-		}
 
 	public:
 		template<typename T>
@@ -402,7 +463,7 @@ namespace corecpp
 				parser.add_command(f.first,
 					corecpp::concat<std::string>({ "Run test '", f.first, "'"}),
 					[&] (command_line& c){
-						return run_fixture(f.first, *f.second);
+						return f.second->run(c, f.first, m_verbose);
 					});
 			}
 
@@ -430,7 +491,7 @@ namespace corecpp
 				res = EXIT_SUCCESS;
 				for (const auto& f : m_fixtures)
 				{
-					if (run_fixture(f.first, *f.second) != EXIT_SUCCESS)
+					if (f.second->run(f.first, m_verbose) != EXIT_SUCCESS)
 						res = EXIT_FAILURE;
 				}
 			}
