@@ -5,6 +5,7 @@
 #include <initializer_list>
 #include <locale>
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -101,11 +102,74 @@ namespace corecpp
 		return true;
 	}
 
+
+	template<typename T>
+	T get_or_def(const T *value, const T def)
+	{
+		return value ? *value : def;
+	}
+
 	template<typename T, typename = std::enable_if_t<std::is_pointer_v<T>> >
 	T get_or_def(const T value, const T def)
 	{
 		return value ? value : def;
 	}
+
+	template<typename T, typename = std::enable_if_t<!std::is_pointer_v<T> && std::is_copy_constructible_v<T>>>
+	T get_or_def(std::optional<T> value, const T def)
+	{
+		return value.has_value() ? value.value() : def;
+	}
+
+
+	template<typename PcharT>
+	struct str_equal_to
+	{
+		constexpr bool operator()(const PcharT lhs, const PcharT rhs) const noexcept
+		{
+			if (lhs == nullptr)
+				return (rhs == nullptr);
+
+			if (rhs == nullptr)
+				return false;
+
+			PcharT l = lhs;
+			PcharT r = rhs;
+
+			while (*l && (*l == *r))
+			{
+				++l;
+				++r;
+			};
+
+			return (*l == *r);
+		}
+	};
+
+	template<typename PcharT>
+	struct str_not_equal_to
+	{
+		constexpr bool operator()(const PcharT* lhs, const PcharT* rhs) const noexcept
+		{
+			if (lhs == nullptr)
+				return (rhs != nullptr);
+
+			if (rhs == nullptr)
+				return true;
+
+			PcharT* l = lhs;
+			PcharT* r = rhs;
+
+			while (*l && *r && (*l != *r))
+			{
+				++l;
+				++r;
+			};
+
+			return (*l != *r);
+		}
+	};
+
 
 	template<typename StringT>
 	StringT toPascalCase(const StringT& in)

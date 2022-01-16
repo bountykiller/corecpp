@@ -1,6 +1,8 @@
 #ifndef CORE_CPP_UNITTEST_H
 #define CORE_CPP_UNITTEST_H
 
+#include <cstring>
+
 #include <algorithm>
 #include <functional>
 #include <iostream>
@@ -193,6 +195,16 @@ namespace corecpp
 		{
 			assert_op<T, std::less_equal>(actual, expected);
 		}
+		template <typename T>
+		void assert_str_equal(const T* actual, const T* expected) const
+		{
+			assert_op<const T*, corecpp::str_equal_to>(actual, expected);
+		}
+		template <typename T>
+		void assert_str_not_equal(const T* actual, const T* expected) const
+		{
+			assert_op<const T*, corecpp::str_not_equal_to>(actual, expected);
+		}
 
 		template <typename T>
 		void fatal_equal(const T& actual, const T& expected) const
@@ -223,6 +235,16 @@ namespace corecpp
 		void fatal_less_equal(const T& actual, const T& expected) const
 		{
 			assert_fatal<T, std::less_equal>(actual, expected);
+		}
+		template <typename T>
+		void fatal_str_equal(const T* actual, const T* expected) const
+		{
+			assert_fatal<const T*, corecpp::str_equal_to>(actual, expected);
+		}
+		template <typename T>
+		void fatal_str_not_equal(const T* actual, const T* expected) const
+		{
+			assert_fatal<const T*, corecpp::str_not_equal_to>(actual, expected);
 		}
 		template <typename ExceptionT>
 		void assert_throws(std::function<void(void)> f) const
