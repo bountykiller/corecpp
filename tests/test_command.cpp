@@ -47,7 +47,7 @@ class test_option final : public test_fixture
 				short_option_parser p { line };
 				logger().trace(corecpp::concat<std::string>({"short option"}), __FILE__, __LINE__);
 				if (t.should_throw)
-					assert_throws<corecpp::format_error>([&] { option.read(p); });
+					assert_throws<std::ios_base::failure>([&] { option.read(p); });
 				else
 					option.read(p);
 			}
@@ -60,7 +60,7 @@ class test_option final : public test_fixture
 				long_option_parser p { t.value };
 				logger().trace(corecpp::concat<std::string>({"long option"}), __FILE__, __LINE__);
 				if (t.should_throw)
-					assert_throws<corecpp::format_error>([&] { option.read(p); });
+					assert_throws<std::ios_base::failure>([&] { option.read(p); });
 				else
 					option.read(p);
 			}
@@ -239,6 +239,11 @@ class test_parser final : public test_fixture
 			{ 0, 0, 0, false, 4, { "program", "--", "1", "2" } },
 			{ 0, 0, 0, false, 3, { "program", "--", "-d" } },
 			{ 0, 0, 0, false, 3, { "program", "--", "--deep-option" } },
+
+			{ 0, 0, 0, false, 3, { "program", "-a", "-b" } },
+			{ 0, 1, 0, false, 3, { "program", "-ab", "1", } },
+			{ 4, 0, 0, true, 3, { "program", "-da", "4" } },
+			{ 0, 0, 4, true, 4, { "program", "-ad", "-c", "4" } },
 		});
 
 		return run(tests, [&](const test& t){
@@ -250,7 +255,7 @@ class test_parser final : public test_fixture
 				program_option {'a', "an-option", "The option A", a },
 				program_option {'b', "option-b", "The option B", b },
 				program_option {'c', "option-c", "The option C", c },
-				program_option {"deep-option", "The option D", d });
+				program_option {'d',"deep-option", "The option D", d });
 			parser.parse_options();
 			assert_equal(a, t.expected_a);
 			assert_equal(b, t.expected_b);

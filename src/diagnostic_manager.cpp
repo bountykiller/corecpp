@@ -103,7 +103,7 @@ channel& manager::_default_channel()
 	if (!m_default)
 	{
 		m_default.reset(new channel(diagnostic_level::success, builtin));
-		m_default->diagnose(diagnostic_level::warning, "no default appender provided, using builtin.", __FILE__, __LINE__);
+		m_default->diagnose(diagnostic_level::trace, "no default appender provided, using builtin.", __FILE__, __LINE__);
 	}
 	return *m_default;
 }

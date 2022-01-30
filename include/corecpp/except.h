@@ -7,8 +7,10 @@
 #include <corecpp/algorithm.h>
 #endif
 
+
 namespace corecpp
 {
+
 	template <typename ExceptionT>
 	class error : public ExceptionT
 	{

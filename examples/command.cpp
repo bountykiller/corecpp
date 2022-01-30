@@ -103,13 +103,10 @@ int main(int argc, char** argv)
 
 	commands.add_param("dummy", "dummy parameter", dummy, true);
 
-	try
+	auto res = commands.parse_options();
+	if (!res)
 	{
-		commands.parse_options();
-	}
-	catch(const std::invalid_argument& e)
-	{
-		std::cerr << "Invalid argument: " << e.what() << std::endl;
+		std::cerr << "Invalid argument: " << res.error().what() << std::endl;
 		return EXIT_FAILURE;
 	}
 

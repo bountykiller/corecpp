@@ -290,7 +290,10 @@ namespace corecpp
 			{}
 			catch(...)
 			{
-				register_failure<std::string>("wrong exception thrown", "another type of exception");
+				/* compiler-dependent stuff */
+				int status;
+				std::unique_ptr<char> name { abi::__cxa_demangle(typeid(ExceptionT).name(), 0, 0, &status) };
+				register_failure<std::string>("wrong exception thrown", name.get());
 			}
 		}
 
@@ -379,22 +382,19 @@ namespace corecpp
 			for (const auto& t : tests())
 			{
 				parser.add_command(t.first, corecpp::concat<std::string>({ "Run test '", t.first, "'"}),
-					[&] ([[maybe_unused]] command_line& c)
+					[this, name {t.first}, method {t.second}, verbose] ([[maybe_unused]] command_line& c)
 					{
 						setup();
-						int res = run(t.first, t.second, verbose);
+						int res = run(name, method, verbose);
 						teardown();
 						return res;
 					});
 			}
 
-			try
+			auto res = parser.parse_options();
+			if ( !res )
 			{
-				parser.parse_options();
-			}
-			catch (const std::exception& e)
-			{
-				std::cout << e.what() << std::endl;
+				std::cout  << graphic_rendition_v<sgr_p::fg_red> << res.error().what() << graphic_rendition_v<sgr_p::all_off> << std::endl;
 				parser.usage();
 				return EXIT_FAILURE;
 			}
@@ -405,17 +405,17 @@ namespace corecpp
 				return EXIT_SUCCESS;
 			}
 
-			int res;
+			int ret;
 			auto cmd = parser.parse_command();
 			if (!cmd) /* no commands found */
 			{
-				res = run(name, verbose);
+				ret = run(name, verbose);
 			}
 			else
-				res = cmd();
+				ret = cmd();
 			std::cout << std::endl;
 
-			return res;
+			return ret;
 		}
 
 		virtual void setup() { m_setted = true; }
@@ -453,8 +453,6 @@ namespace corecpp
 			diagnostic::diagnostic_level dbg_lvl = diagnostic::diagnostic_level::fatal;
 			bool help = false;
 
-			std::cout << "\nSuite " << m_name << "\n" << std::string(m_name.length() + 6, '=')  << "\n\n";
-
 			parser.add_option('v', "verbose", "activate verbose mode", m_verbose);
 			parser.add_option('h', "help", "show help message", help);
 			parser.add_option('d', "debug", "debug level [default:info]", dbg_lvl);
@@ -467,39 +465,38 @@ namespace corecpp
 					});
 			}
 
-			try
+			auto res = parser.parse_options();
+			if ( !res )
 			{
-				parser.parse_options();
-				diagnostic::manager::default_channel().set_level(dbg_lvl);
-			} catch (const std::exception& e)
-			{
-				std::cout << e.what() << std::endl;
+				std::cout << graphic_rendition_v<sgr_p::fg_red> << res.error().what() << graphic_rendition_v<sgr_p::all_off> << std::endl;
 				parser.usage();
 				return EXIT_FAILURE;
 			}
 
+			diagnostic::manager::default_channel().set_level(dbg_lvl);
 			if (help)
 			{
 				parser.usage();
 				return EXIT_SUCCESS;
 			}
 
-			int res;
+			std::cout << "\nSuite " << m_name << "\n" << std::string(m_name.length() + 6, '=')  << "\n\n";
+			int ret;
 			auto cmd = parser.parse_command();
 			if (!cmd) /* no commands found */
 			{
-				res = EXIT_SUCCESS;
+				ret = EXIT_SUCCESS;
 				for (const auto& f : m_fixtures)
 				{
 					if (f.second->run(f.first, m_verbose) != EXIT_SUCCESS)
-						res = EXIT_FAILURE;
+						ret = EXIT_FAILURE;
 				}
 			}
 			else
-				res = cmd();
+				ret = cmd();
 			std::cout << std::endl;
 
-			return res;
+			return ret;
 		}
 	};
 

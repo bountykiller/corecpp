@@ -16,6 +16,7 @@
 #include <corecpp/algorithm.h>
 #include <corecpp/diagnostic.h>
 #include <corecpp/except.h>
+#include <corecpp/expected.h>
 
 #include <corecpp/serialization/common.h>
 
@@ -45,6 +46,7 @@ namespace corecpp
 		virtual void read(short_option_parser& parser) const = 0;
 		virtual void read(long_option_parser& parser) const = 0;
 		virtual void read(argument_parser& parser) const = 0;
+		virtual bool use_default() const = 0;
 	};
 
 	/**
@@ -55,9 +57,14 @@ namespace corecpp
 	class generic_option : public option_reader
 	{
 		T& m_value;
+		std::optional<T> m_default = std::nullopt;
 	public:
 		using value_type = T;
-		generic_option(T& value) : m_value(value)
+		generic_option(T& value)
+		: m_value { value }
+		{}
+		generic_option(T& value, const T& def)
+		: m_value { value }, m_default { def }
 		{}
 		void read(short_option_parser& parser) const override
 		{
@@ -74,6 +81,13 @@ namespace corecpp
 			logger().debug("reading ...", __FILE__, __LINE__);
 			parser.deserialize(m_value);
 		}
+		bool use_default() const override
+		{
+			if ( !m_default.has_value() )
+				return false;
+			m_value = m_default.value();
+			return true;
+		}
 	};
 
 	/**
@@ -83,9 +97,14 @@ namespace corecpp
 	class generic_option<T, std::enable_if_t<std::is_same_v<T, bool>>> : public option_reader
 	{
 		bool& m_value;
+		bool m_default = true;
 	public:
 		using value_type = bool;
-		generic_option(bool& value) : m_value(value)
+		generic_option(bool& value)
+		: m_value { value }
+		{}
+		generic_option(bool& value, bool def)
+		: m_value { value }, m_default  { def }
 		{}
 		void read([[maybe_unused]]short_option_parser& parser) const override
 		{
@@ -103,6 +122,11 @@ namespace corecpp
 		{
 			logger().debug("reading ...", __FILE__, __LINE__);
 			parser.deserialize(m_value);
+		}
+		bool use_default() const override
+		{
+			m_value = m_default;
+			return true;
 		}
 	};
 
@@ -162,6 +186,11 @@ namespace corecpp
 		: m_shortname(shortname), m_name(name), m_helpmsg(helpmsg), m_reader(new generic_option<T>(value))
 		{
 		}
+		template <typename T>
+		program_option(char shortname, std::string name, std::string helpmsg, T& value, const T& def)
+		: m_shortname(shortname), m_name(name), m_helpmsg(helpmsg), m_reader(new generic_option<T>(value, def))
+		{
+		}
 		program_option& operator = (program_option&&) = default;
 
 		bool match(const std::string& name) const
@@ -174,28 +203,16 @@ namespace corecpp
 		}
 		void read(short_option_parser& parser) const
 		{
-			try
-			{
-				m_reader->read(parser);
-			}
-			catch (std::ios_base::failure& e)
-			{
-				corecpp::throws<corecpp::format_error>(
-					corecpp::concat<std::string>({ "invalid value for option '", std::string(1, m_shortname), "' : ", e.what() }));
-			}
+			m_reader->read(parser);
 		}
 		void read(long_option_parser& parser) const
 		{
-			try
-			{
-				m_reader->read(parser);
-			}
-			catch (std::ios_base::failure& e)
-			{
-				corecpp::throws<corecpp::format_error>(
-					corecpp::concat<std::string>({ "invalid value for option '", m_name, "' : ", e.what() }));
-			}
+			m_reader->read(parser);
 		};
+		bool use_default() const
+		{
+			return m_reader->use_default();
+		}
 		std::string helpmsg() const
 		{
 			if (!m_shortname)
@@ -343,13 +360,15 @@ namespace corecpp
 		}
 
 		void usage();
-		void parse_options(void);
+
+		expected<unsigned int, std::invalid_argument> parse_options(void);
+
 		/*!
 		 *\brief Will return the command given on the command line.
 		 *\return The command. If no command was specified, it returns an empty function.
 		 */
 		std::function<int()> parse_command(void);
-		void parse_parameters(void);
+		expected<unsigned int, std::invalid_argument> parse_parameters(void);
 	};
 
 }

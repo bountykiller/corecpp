@@ -50,9 +50,25 @@ using pvalue = typename std::add_pointer<typename type_resolver<T>::type>::type;
 template<typename T>
 using concrete = typename type_resolver<T>::type;
 
+/**
+ * @brief allows to know if a type is an strongly-typed enum
+ * @note will be obsolete in c++23, see std::is_scoped_enum
+ */
+template<typename T, typename Enable = void>
+struct is_strong_enum
+{
+	static constexpr bool value = false;
+};
+
+template<typename T>
+struct is_strong_enum<T, std::enable_if_t<std::is_enum_v<T>
+	&& !std::is_constructible_v<std::underlying_type_t<T>, T>
+	>>
+{
+	static constexpr bool value = true;
+};
 
 /**
- * @class is_iterable
  * @brief allows to know if a class can be browsed through an iterator
  */
 template<typename T, typename Enable = void>
@@ -73,7 +89,6 @@ struct is_iterable<T, std::enable_if_t<!std::is_void<typename T::iterator>::valu
 
 
 /**
- * @class is_associative
  * @brief allows to know if a class is an associative container
  */
 template<typename T, typename Enable = void>
@@ -94,7 +109,6 @@ inline constexpr bool is_associative_v = is_associative<T>::value;
 
 
 /**
- * @class is_dereferencable
  * @brief allows to know of a class can be derefenced through the * or the -> operators
  * TODO: is_dereferencable should also be convertible to bool
  */
@@ -122,7 +136,6 @@ inline constexpr bool is_dereferencable_v = is_dereferencable<T>::value;
 
 
 /**
- * @class is_visitable
  * @brief allows to know if a class is a visitable (typically variant)
  */
 template<typename T, typename VisitorT, typename Enable = void>
@@ -143,7 +156,6 @@ inline constexpr bool is_visitable_v = is_visitable<T,V>::value;
 
 
 /**
- * @class is_time_point
  * @brief allows to know if a class represent a point in time
  */
 template<typename T, typename Enable = void>

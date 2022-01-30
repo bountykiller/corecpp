@@ -79,6 +79,36 @@ class test_reflection final : public test_fixture
 		});
 	}
 
+	test_case_result test_is_strong_enum() const
+	{
+		enum weak
+		{
+			A, B, C
+		};
+		enum class strong
+		{
+			A, B, C
+		};
+		enum class strong2 : uint8_t
+		{
+			A = 1, B = 2, C = 4
+		};
+		struct test { bool actual; bool expected; };
+		test_cases<test> tests ({
+			{ corecpp::is_strong_enum<int>::value, false },
+			{ corecpp::is_strong_enum<int*>::value, false },
+			{ corecpp::is_strong_enum<std::optional<int>>::value, false },
+			{ corecpp::is_strong_enum<std::string>::value, false },
+			{ corecpp::is_strong_enum<weak>::value, false },
+			{ corecpp::is_strong_enum<strong>::value, true },
+			{ corecpp::is_strong_enum<strong2>::value, true },
+		});
+
+		return run(tests, [&](const test& t){
+			assert_equal(t.actual, t.expected);
+		});
+	}
+
 	test_case_result test_alltype() const
 	{
 		struct test { bool actual; bool expected; };
@@ -97,6 +127,7 @@ class test_reflection final : public test_fixture
 			assert_equal(t.actual, t.expected);
 		});
 	}
+
 public:
 	tests_type tests() const override
 	{
@@ -105,6 +136,7 @@ public:
 			{ "test_is_dereferencable", [&] () { return test_is_dereferencable(); } },
 			{ "test_is_associative", [&] () { return test_is_associative(); } },
 			{ "test_is_time_point", [&] () { return test_is_time_point(); } },
+			{ "test_is_strong_enum", [&] () { return test_is_strong_enum(); } },
 			{ "test_alltype", [&] () { return test_alltype(); } }
 		};
 	}

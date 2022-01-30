@@ -6,6 +6,7 @@
  */
 #include <iostream>
 #include <corecpp/cli/command_line.h>
+#include <corecpp/cli/graphics.h>
 #include <corecpp/cli/parser.h>
 
 namespace corecpp
@@ -49,9 +50,11 @@ corecpp::diagnostic::event_producer& command_line_parser::logger()
 	return logger;
 }
 
-void command_line_parser::parse_options(void)
+expected<unsigned int, std::invalid_argument> command_line_parser::parse_options(void)
 {
-	while(const char* token = m_command_line.peek())
+	unsigned int read_options = 0;
+
+	while (const char* token = m_command_line.peek())
 	{
 		if (*token != '-')
 			break;
@@ -62,7 +65,7 @@ void command_line_parser::parse_options(void)
 				break; /* seeing -- on the command line means we have no more options to read */
 			std::string value = "";
 			auto pos = param.find('=');
-			if(pos == std::string::npos)
+			if (pos == std::string::npos)
 			{
 				//param with no value => value is let to an empty string
 				param = param.substr(2);
@@ -72,37 +75,64 @@ void command_line_parser::parse_options(void)
 				value = param.substr(pos+1);
 				param = param.substr(2, pos - 2);
 			}
-			logger().trace(corecpp::concat<std::string>({"parsing ", param, " [", value, "]"}), __FILE__, __LINE__);
+			logger().trace(corecpp::concat<std::string>({"option ", param, " [", value, "]"}), __FILE__, __LINE__);
 			auto option = get_option(param);
 			if (option == m_options.end())
-				throw std::invalid_argument(param);
-			long_option_parser parser { value };
-			option->read(parser);
+				return std::invalid_argument { corecpp::concat<std::string>({ "--", param, ": unknow option" }) };
+			++read_options;
+			if (!value.empty())
+			{
+				long_option_parser parser { value };
+				try {
+					option->read(parser);
+				}
+				catch (std::exception& e)
+				{
+					return std::invalid_argument { corecpp::concat<std::string>({ param, ": ", e.what() }) };
+				}
+			}
+			else
+				option->use_default();
 		}
 		else if (param[0] == '-')
 		{
 			param = param.substr(1);
-			logger().trace(corecpp::concat<std::string>({"parsing ", param}), __FILE__, __LINE__);
-			const char* value = m_command_line.peek();
-			if(value && *value == '-') //another option
-				value = nullptr;
-			//for loop because we can have multiple params
-			for(auto iter = param.begin(); iter != param.end(); ++iter)
+			logger().trace(corecpp::concat<std::string>({"option(s) ", param}), __FILE__, __LINE__);
+			// loop because we can have multiple params
+			auto iter = param.begin();
+			while(true)
 			{
 				char shortname = *iter;
 				auto option = get_option(shortname);
-				if(option == m_options.end())
-					throw std::invalid_argument(std::string(1, shortname));
-				short_option_parser parser { m_command_line };
-				option->read(parser);//consume the parameter
+				if (option == m_options.end())
+					return std::invalid_argument { corecpp::concat<std::string>({ "-", std::string { 1, shortname }, ": unknow option" }) };
+				++read_options;
+				++iter;
+				if (iter == param.end())
+				{
+					short_option_parser parser { m_command_line };
+					try {
+						option->read(parser);//consume the parameter
+					}
+					catch (std::exception& e)
+					{
+						return std::invalid_argument { corecpp::concat<std::string>({ "-", std::string { 1, shortname }, ": invalid value" }) };
+					}
+					break;
+				}
+				else
+					option->use_default();
 			}
 		}
 	}
+
+	return read_options;
 }
 
 void command_line_parser::usage()
 {
-	std::cout << "Usage : " << m_command_line.program() << m_command_line.commands();
+	std::cout << graphic_rendition_v<sgr_p::fg_yellow> << "Usage: \n\t" << graphic_rendition_v<sgr_p::all_off>
+			<< m_command_line.program() << m_command_line.commands();
 	if (m_options.size() > 0)
 		std::cout << " [<options>]";
 	if (m_commands.size() > 0)
@@ -117,44 +147,54 @@ void command_line_parser::usage()
 
 	if (m_options.size() > 0)
 	{
-		std::cout << "\nOptions:\n";
+		std::cout << graphic_rendition_v<sgr_p::fg_yellow> << "\n\nOptions:" << graphic_rendition_v<sgr_p::all_off>;
 		for (const auto& option : m_options)
 		{
-			std::cout << option.helpmsg() << '\n';
+			std::cout << '\n' << option.helpmsg();
 		}
 	}
 
 	if (m_commands.size() > 0)
 	{
-		std::cout << "\nCommands:\n";
+		std::cout << graphic_rendition_v<sgr_p::fg_yellow> << "\n\nCommands:" << graphic_rendition_v<sgr_p::all_off>;
 		for (const auto& command : m_commands)
 		{
-			std::cout << command.helpmsg() << '\n';
+			std::cout << '\n' << command.helpmsg();
 		}
 	}
 
 	if (m_params.size() > 0)
 	{
-		std::cout << "\nParameters:\n";
+		std::cout << graphic_rendition_v<sgr_p::fg_yellow> << "\n\nParameters:" << graphic_rendition_v<sgr_p::all_off>;
 		for (const auto& param : m_params)
 		{
-			std::cout << param.helpmsg() << '\n';
+			std::cout << '\n' << param.helpmsg();
 		}
 	}
-	std::cout << std::endl;
+	std::cout << '\n' << std::endl;
 }
 
-void command_line_parser::parse_parameters(void)
+expected<unsigned int, std::invalid_argument> command_line_parser::parse_parameters(void)
 {
+	unsigned int parsed = 0;
 	argument_parser parser { m_command_line };
 	for (const auto& parameter : m_params)
 	{
 		if (m_command_line.peek() != nullptr)
-			parameter.read(parser);
+		{
+			try {
+				parameter.read(parser);
+			}
+			catch (std::exception& e)
+			{
+				return std::invalid_argument { corecpp::concat<std::string>({ parameter.name(), ": ", e.what() }) };
+			}
+			parsed++;
+		}
 		else if (parameter.is_required())
-			corecpp::throws<std::invalid_argument>(
-				corecpp::concat<std::string>({ parameter.name(), " is required." }));
+			return std::invalid_argument { corecpp::concat<std::string>({ parameter.name(), " is required." }) };
 	}
+	return parsed;
 }
 
 std::function<int()> command_line_parser::parse_command(void)
