@@ -6,13 +6,10 @@
 #include <memory>
 #include <iomanip>
 
-#include <corecpp/algorithm.h>
-#include <corecpp/serialization/common.h>
 #include <corecpp/serialization/json.h>
 
-namespace corecpp
-{
-namespace json
+
+namespace corecpp::json
 {
 
 corecpp::diagnostic::channel& json_channel()
@@ -941,8 +938,6 @@ void deserializer::read()
 	while (!token);
 	json_logger().trace("read token", to_string(*token), __FILE__, __LINE__);
 	m_current = std::move(*token);
-}
-
 }
 
 

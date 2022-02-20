@@ -17,7 +17,9 @@
 #include <corecpp/algorithm.h>
 #include <corecpp/net/mailaddress.h>
 #include <corecpp/serialization/json.h>
+#include <corecpp/serialization/xml.h>
 #include <corecpp/flags.h>
+#include <corecpp/cli/command_line.h>
 
 enum struct rights {
 	read = 1 << 0,
@@ -123,7 +125,28 @@ void map_example(void)
 
 int main(int argc, char** argv)
 {
-	corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::info);
+	unsigned int verbosity = 0;
+	corecpp::command_line args { argc, argv };
+	corecpp::command_line_parser commands { args };
+	commands.add_options(
+		corecpp::program_option { 'v', "verbose", "enable verbose", verbosity }
+	);
+	auto res = commands.parse_options();
+	if (!res)
+	{
+		std::cerr << "Invalid argument: " << res.error().what() << std::endl;
+		return EXIT_FAILURE;
+	}
+
+	if (verbosity >= 3)
+		corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::debug);
+	else if (verbosity == 2)
+		corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::trace);
+	else if (verbosity == 1)
+		corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::info);
+	else
+		corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::success);
+
 	static const std::string json_simple =
 		"{\"uid\":1,\"lastname\":\"masse\",\"firstname\":\"jeronimo\",\"creation_date\":1570835059013794610,\"groups\":["
 			"{ \"value\": {\"name\":\"users\",\"id\":1, \"comment\":{}, \"permissions\": { \"value\": 2 }} },"
@@ -142,7 +165,8 @@ int main(int argc, char** argv)
 		<< " (created on " << std::put_time(std::localtime(&created), "%c %Z") << ")" << std::endl;
 	std::cout << "Now serialize it!" << std::endl;
 	/* construct a serializer which will write the result on stdout */
-	corecpp::json::serializer s(std::cout, true);
+	//corecpp::json::serializer s(std::cout, true);
+	corecpp::xml::serializer s(std::cerr, false, true);
 	/* now deserialize usr */
 	s.serialize(usr);
 
