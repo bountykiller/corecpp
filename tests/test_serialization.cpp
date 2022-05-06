@@ -178,13 +178,13 @@ public:
 		};
 
 		test_cases<type_test<flags<my_enum>>> flags {
-			{ my_enum::first,  "{value:1}" },
-			{ my_enum::second, "{value:2}" },
-			{ my_enum::tierce, "{value:4}" },
-			{ my_enum::first | my_enum::second, "{value:3}" },
-			{ my_enum::first | my_enum::tierce, "{value:5}" },
-			{ my_enum::second| my_enum::tierce, "{value:6}" },
-			{ my_enum::first | my_enum::second | my_enum::tierce, "{value:7}" },
+			{ my_enum::first,  "{\"value\":1}" },
+			{ my_enum::second, "{\"value\":2}" },
+			{ my_enum::tierce, "{\"value\":4}" },
+			{ my_enum::first | my_enum::second, "{\"value\":3}" },
+			{ my_enum::first | my_enum::tierce, "{\"value\":5}" },
+			{ my_enum::second| my_enum::tierce, "{\"value\":6}" },
+			{ my_enum::first | my_enum::second | my_enum::tierce, "{\"value\":7}" },
 		};
 
 		return run_tests(my_enums) + run_tests(flags);
