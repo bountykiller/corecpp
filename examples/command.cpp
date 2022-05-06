@@ -15,7 +15,7 @@ int add(corecpp::command_line& line)
 	if (show_help)
 	{
 		addition.usage();
-		return show_help ? EXIT_SUCCESS : EXIT_FAILURE;
+		return EXIT_SUCCESS;
 	}
 	addition.parse_parameters();
 

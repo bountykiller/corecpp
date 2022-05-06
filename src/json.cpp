@@ -768,7 +768,7 @@ void serializer::convert_and_escape(const std::string& value)
 		else if (c < 0x10)
 			m_stream << "\\u000" << hex_chars[c & 0x0F];
 		else
-			m_stream << "\\u00" << (hex_chars[c & 0xF0] << 4) << hex_chars[c & 0x0F];
+			m_stream << "\\u00" << hex_chars[(c & 0xF0) >> 4] << hex_chars[c & 0x0F];
 	}
 }
 
@@ -779,7 +779,7 @@ void serializer::convert_and_escape(const std::wstring& value)
 	/* TODO: support not only UTF8 */
 	for (wchar_t c : value)
 	{
-		if (std::isprint((char)c))
+		if ((c > 0) &&  std::isprint((char)c))
 		{
 			if ( (char)c == '\\' || (char)c == '\"' )
 				m_stream << '\\';
@@ -788,7 +788,7 @@ void serializer::convert_and_escape(const std::wstring& value)
 		else if (c < 0x10)
 			m_stream << "\\u000" << hex_chars[c & 0x0F];
 		else if (c < 0x100)
-			m_stream << "\\u00" << hex_chars[(c & 0xF0) << 4] << hex_chars[c & 0x0F];
+			m_stream << "\\u00" << hex_chars[(c & 0xF0) >> 4] << hex_chars[c & 0x0F];
 		else if (c <= 0x7FF)
 		{
 			m_stream << (c >> 6) + 0xC0;
@@ -819,7 +819,7 @@ void serializer::convert_and_escape(const std::u16string& value)
 	/* TODO: support not only UTF8 */
 	for (char16_t c : value)
 	{
-		if (std::isprint((char)c))
+		if ((c > 0) &&  std::isprint((char)c))
 		{
 			if ( (char)c == '\\' || (char)c == '\"' )
 				m_stream << '\\';
@@ -828,7 +828,7 @@ void serializer::convert_and_escape(const std::u16string& value)
 		else if (c < 0x10)
 			m_stream << "\\u000" << hex_chars[c & 0x0F];
 		else if (c < 0x100)
-			m_stream << "\\u00" << hex_chars[(c & 0xF0) << 4] << hex_chars[c & 0x0F];
+			m_stream << "\\u00" << hex_chars[(c & 0xF0) >> 4] << hex_chars[c & 0x0F];
 		else if (c <= 0x7FF)
 		{
 			m_stream << (c >> 6) + 0xC0;
@@ -852,7 +852,7 @@ void serializer::convert_and_escape(const std::u32string& value)
 	/* TODO: support not only UTF8 */
 	for (char32_t c : value)
 	{
-		if (std::isprint((char)c))
+		if ((c > 0) &&  std::isprint((char)c))
 		{
 			if ( (char)c == '\\' || (char)c == '\"' )
 				m_stream << '\\';
@@ -861,7 +861,7 @@ void serializer::convert_and_escape(const std::u32string& value)
 		else if (c < 0x10)
 			m_stream << "\\u000" << hex_chars[c & 0x0F];
 		else if (c < 0x100)
-			m_stream << "\\u00" << hex_chars[(c & 0xF0) << 4] << hex_chars[c & 0x0F];
+			m_stream << "\\u00" << hex_chars[(c & 0xF0) >> 4] << hex_chars[c & 0x0F];
 		else if (c <= 0x7FF)
 		{
 			m_stream << (c >> 6) + 0xC0;

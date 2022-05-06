@@ -101,9 +101,9 @@ class test_json_serialization final : public test_fixture
 	};
 
 	template<typename T>
-	test_case_result run_tests(const T& tests) const
+	test_case_result run_tests(const T& cases) const
 	{
-		return run(tests, [&](const auto& t){
+		return run(cases, [&](const auto& t){
 			typename T::test_type::value_type value;
 			std::ostringstream oss;
 			corecpp::json::serializer serializer { oss };
@@ -125,17 +125,17 @@ public:
 
 	test_case_result test_bool() const
 	{
-		test_cases<type_test<bool>> tests {
+		test_cases<type_test<bool>> cases {
 			{ false, "false" },
 			{ true, "true" },
 		};
 
-		return run_tests(tests);
+		return run_tests(cases);
 	}
 
 	test_case_result test_int() const
 	{
-		test_cases<type_test<int>> tests {
+		test_cases<type_test<int>> cases {
 			{ 0, "0" },
 			{ 1, "1" },
 			{ 10, "10" },
@@ -145,12 +145,12 @@ public:
 			{ -999, "-999" },
 		};
 
-		return run_tests(tests);
+		return run_tests(cases);
 	}
 
 	test_case_result test_str() const
 	{
-		test_cases<type_test<std::string>> tests {
+		test_cases<type_test<std::string>> cases {
 			{ "", "\"\"" },
 			{ "\\", "\"\\\\\"" },
 			{ "", "\"\"" },
@@ -160,7 +160,7 @@ public:
 			{ "12345", "\"12345\"" },
 		};
 
-		return run_tests(tests);
+		return run_tests(cases);
 	}
 	test_case_result test_enum() const
 	{
@@ -171,13 +171,13 @@ public:
 			{ my_enum::tierce, "Last" }
 		};
 
-		test_cases<type_test<my_enum>> tests {
+		test_cases<type_test<my_enum>> my_enums {
 			{ my_enum::first, "1" },
 			{ my_enum::second, "2" },
 			{ my_enum::tierce, "4" }
 		};
 
-		test_cases<type_test<flags<my_enum>>> test_flags {
+		test_cases<type_test<flags<my_enum>>> flags {
 			{ my_enum::first,  "{value:1}" },
 			{ my_enum::second, "{value:2}" },
 			{ my_enum::tierce, "{value:4}" },
@@ -187,35 +187,35 @@ public:
 			{ my_enum::first | my_enum::second | my_enum::tierce, "{value:7}" },
 		};
 
-		return run_tests(tests) + run_tests(tests);
+		return run_tests(my_enums) + run_tests(flags);
 	}
 
 	test_case_result test_structured_types() const
 	{
-		test_cases<type_test<structured>> tests {
+		test_cases<type_test<structured>> cases {
 			{ { 0, false, "" }, { "{\"i\":0,\"b\":false,\"str\":\"\"}" } },
 			{ { 1, true, "true" }, { "{\"i\":1,\"b\":true,\"str\":\"true\"}" } },
 			{ { -1, true, "a string" }, { "{\"i\":-1,\"b\":true,\"str\":\"a string\"}" } },
 			{ { -999, false, "'a'" }, { "{\"i\":-999,\"b\":false,\"str\":\"'a'\"}" } },
 		};
 
-		return run_tests(tests);
+		return run_tests(cases);
 	}
 
 	test_case_result test_complex_types() const
 	{
-		test_cases<type_test<complex>> tests {
+		test_cases<type_test<complex>> cases {
 			{ { 0, 0 }, "{\"real_part\":0,\"imaginary_part\":0}" },
 			{ { -1, 1 }, "{\"real_part\":-1,\"imaginary_part\":1}" },
 			{ { 999, 999 }, "{\"real_part\":999,\"imaginary_part\":999}" },
 		};
 
-		return run_tests(tests);
+		return run_tests(cases);
 	}
 
 	test_case_result test_array_types() const
 	{
-		test_cases<type_test<std::vector<int>>> tests {
+		test_cases<type_test<std::vector<int>>> cases {
 			{ { }, "[]" },
 			{ { 0, 1 }, "[0,1]" },
 			{ { -1, 1 }, "[-1,1]" },
@@ -223,7 +223,7 @@ public:
 			{ { 1, 2, 3, 999, 999 }, "[1,2,3,999,999]" },
 		};
 
-		return run_tests(tests);
+		return run_tests(cases);
 	}
 
 public:

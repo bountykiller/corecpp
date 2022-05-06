@@ -16,7 +16,7 @@ class test_get_or_def final : public test_fixture
 	test_case_result test_pchar() const
 	{
 		struct test { const char* in; const char* def; const char* expected; };
-		test_cases<test> tests ({
+		test_cases<test> cases ({
 			{ "", "", "" },
 			{ " ", "", " " },
 			{ "", " ", "" },
@@ -36,7 +36,7 @@ class test_get_or_def final : public test_fixture
 			{ "a", "b", "a" },
 		});
 
-		return run(tests, [&](const test& t){
+		return run(cases, [&](const test& t){
 			auto res = corecpp::get_or_def(t.in, t.def);
 			assert_str_equal(res, t.expected);
 		});
@@ -45,7 +45,7 @@ class test_get_or_def final : public test_fixture
 	test_case_result test_optional() const
 	{
 		struct test { std::optional<int> in; int def; int expected; };
-		test_cases<test> tests ({
+		test_cases<test> cases ({
 			{ std::nullopt, 0, 0 },
 			{ std::nullopt, 1, 1 },
 
@@ -54,7 +54,7 @@ class test_get_or_def final : public test_fixture
 			{ 1, 2, 1 },
 		});
 
-		return run(tests, [&](const test& t){
+		return run(cases, [&](const test& t){
 			int res = corecpp::get_or_def(t.in, t.def);
 			assert_equal(res, t.expected);
 		});
@@ -64,7 +64,7 @@ class test_get_or_def final : public test_fixture
 	{
 		struct test { const int* in; int def; int expected; };
 		const int one = 1;
-		test_cases<test> tests ({
+		test_cases<test> cases ({
 			{ nullptr, 0, 0 },
 			{ nullptr, 1, 1 },
 
@@ -73,7 +73,7 @@ class test_get_or_def final : public test_fixture
 			{ &one, 2, 1 },
 		});
 
-		return run(tests, [&](const test& t){
+		return run(cases, [&](const test& t){
 			int res = corecpp::get_or_def(t.in, t.def);
 			assert_equal(res, t.expected);
 		});

@@ -79,7 +79,7 @@ class test_option final : public test_fixture
 			bool match;
 			int expected;
 		};
-		test_cases<test> tests ({
+		test_cases<test> cases ({
 			{ "i", "1", false, true, 1 },
 			{ "int", "2", false, true, 2 },
 			{ "i", "aaa", true, true, 0 },
@@ -92,7 +92,7 @@ class test_option final : public test_fixture
 			{ "1", "i", false, false, 0 },
 		});
 
-		return run(tests, [&](const test& t){
+		return run(cases, [&](const test& t){
 			int actual;
 			program_option option('i',"int", "an integer value", actual);
 			do_test(option, t, actual);
@@ -109,7 +109,7 @@ class test_option final : public test_fixture
 			bool expected;
 		};
 
-		test_cases<test> tests ({
+		test_cases<test> cases ({
 			{ "b", "", false, true, true },
 			{ "b", "1", false, true, true },
 			{ "b", "0", false, true, true },
@@ -122,7 +122,7 @@ class test_option final : public test_fixture
 			{ "unknown", "true", false, false, false },
 		});
 
-		return run(tests, [&](const test& t){
+		return run(cases, [&](const test& t){
 			bool actual = false;
 			program_option option('b',"a_bool", "a boolean", actual);
 			do_test(option, t, actual);
@@ -139,7 +139,7 @@ class test_option final : public test_fixture
 			std::string expected;
 		};
 
-		test_cases<test> tests ({
+		test_cases<test> cases ({
 			{ "s", "", false, true, "" },
 			{ "s", "1", false, true, "1" },
 			{ "s", "0", false, true, "0" },
@@ -153,7 +153,7 @@ class test_option final : public test_fixture
 			/* TODO: add locale testing */
 		});
 
-		return run(tests, [&](const test& t){
+		return run(cases, [&](const test& t){
 			std::string actual;
 			program_option option('s',"str", "a string value", actual);
 			do_test(option, t, actual);
@@ -170,7 +170,7 @@ class test_option final : public test_fixture
 			std::vector<int> expected;
 		};
 
-		test_cases<test> tests ({
+		test_cases<test> cases ({
 			{ "v",       "",      false, true,  { } },
 			{ "v",       "1",     false, true,  { 1 } },
 			{ "v",       "1 2 3", false, true,  { 1, 2, 3 } },
@@ -188,7 +188,7 @@ class test_option final : public test_fixture
 			{ "unknown", "true",  false, false, { } },
 		});
 
-		return run(tests, [&](const test& t){
+		return run(cases, [&](const test& t){
 			std::vector<int> actual;
 			program_option option('v',"vector", "a vector of integers", actual);
 			do_test(option, t, actual);
@@ -223,7 +223,7 @@ class test_parser final : public test_fixture
 			std::vector<char const *> argv;
 		};
 
-		test_cases<test> tests ({
+		test_cases<test> cases ({
 			{ 0, 0, 0, false, 0, { "" } },
 			{ 0, 0, 0, false, 1, { "program" } },
 			{ 1, 0, 0, false, 2, { "program", "--an-option=1" } },
@@ -246,7 +246,7 @@ class test_parser final : public test_fixture
 			{ 0, 0, 4, true, 4, { "program", "-ad", "-c", "4" } },
 		});
 
-		return run(tests, [&](const test& t){
+		return run(cases, [&](const test& t){
 			int a = 0, b = 0, c = 0;
 			bool d = false;
 			command_line line { t.argc, const_cast<char**>(t.argv.data()) }; /* const_cast required due to C API */
@@ -272,7 +272,7 @@ class test_parser final : public test_fixture
 			std::vector<int> expected;
 		};
 
-		test_cases<test> tests ({
+		test_cases<test> cases ({
 			{ 1, { "program" }, {} },
 			{ 2, { "program", "1" }, { 1 } },
 			{ 3, { "program", "1", "2" }, { 1, 2 } },
@@ -311,7 +311,7 @@ class test_parser final : public test_fixture
 			{ 5, { "program","-b", "0", "NaN", "1" }, { 0, 0, 1 } },
 		});
 
-		return run(tests, [&](const test& t){
+		return run(cases, [&](const test& t){
 			int a = 0;
 			bool b;
 			std::vector<int> value = {};
