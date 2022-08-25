@@ -151,6 +151,34 @@ std::unique_ptr<token> tokenizer::read_string_literal()
 	return std::make_unique<token>(string_token { literal });
 }
 
+unsigned int tokenizer::read_exponential(char c)
+{
+	unsigned int exponential_value = 0;
+	for (; m_buffer.in_avail() >= 0; c = m_buffer.sbumpc())
+	{
+		switch(c)
+		{
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+			case '8':
+			case '9':
+				exponential_value = (10 * exponential_value) + (c - '0');
+				break;
+			default:
+			{
+				return exponential_value;
+			}
+		}
+	}
+	return 0;
+}
+
 std::unique_ptr<token> tokenizer::read_numeric_literal(char c)
 {
 	bool negative = false;
@@ -180,6 +208,32 @@ std::unique_ptr<token> tokenizer::read_numeric_literal(char c)
 			case '9':
 				integral_value = (10 * integral_value) + (c - '0');
 				break;
+			case 'e':
+			case 'E':
+			{
+				bool negative_exponential = false;
+
+				if (m_buffer.in_avail() < 0)
+					return nullptr;
+
+				c = m_buffer.sbumpc();
+				if (c == '-' || c == '+')
+				{
+					negative_exponential = (c == '-');
+					if (m_buffer.in_avail() < 0)
+						return nullptr;
+					c = m_buffer.sbumpc();
+				}
+
+				auto exponential_value = read_exponential(c);
+				double value = integral_value;
+				if (!negative_exponential)
+					value *= pow(10, exponential_value);
+				else
+					value /= pow(10, exponential_value);
+				m_buffer.sungetc();
+				return std::make_unique<token>(numeric_token { negative ? -value : value });
+			}
 			case '.':
 			{
 				long decimal_value = 0;
@@ -205,7 +259,6 @@ std::unique_ptr<token> tokenizer::read_numeric_literal(char c)
 						case 'e':
 						case 'E':
 						{
-							long exponential_value = 0;
 							bool negative_exponential = false;
 
 							if (m_buffer.in_avail() < 0)
@@ -220,31 +273,14 @@ std::unique_ptr<token> tokenizer::read_numeric_literal(char c)
 								c = m_buffer.sbumpc();
 							}
 
-							for (; m_buffer.in_avail() >= 0; c = m_buffer.sbumpc())
-							{
-								switch(c)
-								{
-									case '0':
-									case '1':
-									case '2':
-									case '3':
-									case '4':
-									case '5':
-									case '6':
-									case '7':
-									case '8':
-									case '9':
-										exponential_value = (10 * decimal_value) + (c - '0');
-										break;
-									default:
-									{
-										double value = exp((double)integral_value + ((double)decimal_value/decimal_precision));
-										m_buffer.sungetc();
-										return std::make_unique<token>(numeric_token { negative ? -value : value });
-									}
-								}
-							}
-							break;
+							auto exponential_value = read_exponential(c);
+							double value = ((double)integral_value + ((double)decimal_value/decimal_precision));
+							if (!negative_exponential)
+								value *= pow(10, exponential_value);
+							else
+								value /= pow(10, exponential_value);
+							m_buffer.sungetc();
+							return std::make_unique<token>(numeric_token { negative ? -value : value });
 						}
 						default:
 						{

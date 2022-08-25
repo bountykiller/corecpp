@@ -148,6 +148,22 @@ public:
 		return run_tests(cases);
 	}
 
+	test_case_result test_numeric() const
+	{
+		test_cases<type_test<double>> cases {
+			{ 0.0, "0.0" },
+			{ 1.0, "1" },
+			{ 10000, "10e3" },
+			{ 6.99, "6.99" },
+			{ 7.09e2, "709" },
+			{ 9.07e-1, "0.907" },
+			{ -1.5, "-1.5" },
+			{ 666.87e-2, "6.6687" },
+		};
+
+		return run_tests(cases);
+	}
+
 	test_case_result test_str() const
 	{
 		test_cases<type_test<std::string>> cases {
@@ -232,6 +248,7 @@ public:
 		return {
 			{ "booleans", [&] () { return test_bool(); } },
 			{ "int", [&] () { return test_int(); } },
+			{ "numeric", [&] () { return test_numeric(); } },
 			{ "string", [&] () { return test_str(); } },
 			{ "enumerations", [&] () { return test_enum(); } },
 			{ "structured_types", [&] () { return test_structured_types(); } },

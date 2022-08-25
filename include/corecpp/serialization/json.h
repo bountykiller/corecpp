@@ -83,6 +83,7 @@ namespace corecpp::json
 		std::locale m_locale;
 
 		wchar_t read_escaped_char();
+		unsigned int read_exponential(char c);
 		std::unique_ptr<token> read_string_literal();
 		std::unique_ptr<token> read_numeric_literal(char c);
 	public:
@@ -377,6 +378,7 @@ namespace corecpp::json
 		}
 		void serialize(float value)
 		{
+			/* TODO: set the precision? */
 			m_stream << std::to_string(value);
 		}
 		void serialize(double value)
@@ -605,9 +607,15 @@ namespace corecpp::json
 		template<typename FloatT, typename = std::enable_if<std::is_integral<FloatT>::value, FloatT>>
 		void deserialize_float(FloatT& value)
 		{
-			if (m_current.index() != token::index_of<numeric_token>::value)
-				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "numeric token expected, got ", to_string(m_current) }));
-			auto result = m_current.get<numeric_token>().value;
+			if (m_current.index() != token::index_of<numeric_token>::value
+				&& m_current.index() != token::index_of<integral_token>::value)
+				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "numeric or integral token expected, got ", to_string(m_current) }));
+
+			double result;
+			if (m_current.index() == token::index_of<numeric_token>::value)
+				result = m_current.get<numeric_token>().value;
+			else
+				result = m_current.get<integral_token>().value;
 			if (result > std::numeric_limits<FloatT>::max()
 				|| result < std::numeric_limits<FloatT>::lowest())
 				corecpp::throws<std::overflow_error>(std::to_string(result));

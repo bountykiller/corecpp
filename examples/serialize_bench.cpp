@@ -142,7 +142,7 @@ int main(int argc, char** argv)
 	{
 		corecpp::json::serializer s(std::cout, pretty);
 		auto start = std::chrono::system_clock::now();
-		s.serialize(users);
+				s.serialize(users);
 		auto end = std::chrono::system_clock::now();
 		std::chrono::duration<double> diff = end - start;
 		std::cout << "done, serialisation of " << number << " users took "
