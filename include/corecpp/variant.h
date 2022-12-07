@@ -48,7 +48,7 @@ namespace
 /*!
  * \brief class intented to implement the variant concept
  * NOTE: While this class tend to use some of the stl vocabulary, it is not stl-compliant
- * Unlike stl-variant, this class should support references types (though some operations like copies don't work woth them)
+ * Unlike stl-variant, this class should support references types (though some operations like copies don't work with them)
  */
 template<typename... TArgs>
 class variant
@@ -56,6 +56,7 @@ class variant
 	using this_type = corecpp::variant<TArgs...>;
 	int m_type_index;
 	unsigned char m_data[sizeof(std::aligned_union_t<1, TArgs...>)];
+
 public:
 	template<typename T>
 	struct index_of
@@ -74,10 +75,13 @@ public:
 
 	/* TODO */
 	static inline bool has_reference = corecpp::all_type<std::is_reference, TArgs...>::value;
-	static inline constexpr bool is_move_constructible = corecpp::all_type<std::is_move_constructible, TArgs...>::value;
-	static inline constexpr bool is_nothrow_move_constructible = corecpp::all_type<std::is_nothrow_move_constructible, TArgs...>::value;
-	static inline constexpr bool is_copy_constructible = corecpp::all_type<std::is_copy_constructible, TArgs...>::value;
-	static inline constexpr bool is_nothrow_copy_constructible = corecpp::all_type<std::is_nothrow_copy_constructible, TArgs...>::value;
+	static constexpr bool is_move_constructible = corecpp::all_type<std::is_move_constructible, TArgs...>::value;
+	static constexpr bool is_nothrow_move_constructible = corecpp::all_type<std::is_nothrow_move_constructible, TArgs...>::value;
+	static constexpr bool is_copy_constructible = corecpp::all_type<std::is_copy_constructible, TArgs...>::value;
+	static constexpr bool is_nothrow_copy_constructible = corecpp::all_type<std::is_nothrow_copy_constructible, TArgs...>::value;
+	static constexpr bool is_move_assignable = corecpp::all_type<std::is_move_assignable, TArgs...>::value;
+	static constexpr bool is_copy_assignable = corecpp::all_type<std::is_copy_assignable, TArgs...>::value;
+	static constexpr size_t size = sizeof...(TArgs);
 
 	/* Here the behaviour differs from STL.
 	 * Default initialisation return a value-less variant,
@@ -120,7 +124,9 @@ public:
 	}
 	~variant()
 	{
-		reset();
+		// test if the index is valid to avoid throwing an exception in the dtor
+		if ( m_type_index >= size ) [[likely]]
+			reset();
 		m_type_index = -1;
 	}
 
@@ -128,24 +134,79 @@ public:
 	{
 		if(this == std::addressof(other))
 			return *this;
-		reset();
-		m_type_index = other.m_type_index;
-		visit([&other](auto& value) {
-			using ValueT = std::remove_reference_t<decltype(value)>;
-			new (&value) ValueT(other.template get<ValueT>());
-		});
+
+		if constexpr (is_copy_assignable)
+		{
+			if (m_type_index == other.m_type_index)
+			{
+				visit([this](const auto& value) {
+					using ValueT = std::remove_reference_t<decltype(value)>;
+					get<ValueT>() = value;
+				});
+			}
+			else
+			{
+				reset();
+				if (other.m_type_index >= 0)
+				{
+					m_type_index = other.m_type_index;
+					visit([&other](auto& value) {
+						using ValueT = std::remove_reference_t<decltype(value)>;
+						new (&value) ValueT(other.template get<ValueT>());
+					});
+				}
+			}
+
+		}
+		else
+		{
+			reset();
+			m_type_index = other.m_type_index;
+			visit([&other](auto& value) {
+				using ValueT = std::remove_reference_t<decltype(value)>;
+				new (&value) ValueT(other.template get<ValueT>());
+			});
+		}
+
 		return *this;
 	}
+
 	variant& operator = (variant&& other)
 	{
 		if(this == std::addressof(other))
 			return *this;
-		reset();
-		m_type_index = other.m_type_index;
-		visit([&other](auto& value) {
-			using ValueT = std::remove_reference_t<decltype(value)>;
-			new (&value) ValueT(std::move(other.template get<ValueT>()));
-		});
+
+		if constexpr (is_move_assignable)
+		{
+			if (m_type_index == other.m_type_index)
+			{
+				visit([this](auto& value) {
+					using ValueT = std::remove_reference_t<decltype(value)>;
+					get<ValueT>() = std::move(value);
+				});
+			}
+			else
+			{
+				reset();
+				if (other.m_type_index >= 0)
+				{
+					m_type_index = other.m_type_index;
+					visit([&other](auto& value) {
+						using ValueT = std::remove_reference_t<decltype(value)>;
+						new (&value) ValueT(std::move(other.template get<ValueT>()));
+					});
+				}
+			}
+		}
+		else
+		{
+			reset();
+			m_type_index = other.m_type_index;
+			visit([&other](auto& value) {
+				using ValueT = std::remove_reference_t<decltype(value)>;
+				new (&value) ValueT(std::move(other.template get<ValueT>()));
+			});
+		}
 		return *this;
 	}
 
@@ -153,8 +214,7 @@ public:
 	variant& operator = (T&& data)
 	{
 		using ValueT = std::remove_reference_t<T>;
-		if (static_cast<void*>(std::addressof(this->m_data))
-			== static_cast<void*>(std::addressof(data)))
+		if (static_cast<void*>(std::addressof(this->m_data)) == static_cast<void*>(std::addressof(data)))
 			return *this;
 		reset();
 		m_type_index = index_of<T>::value;
@@ -166,8 +226,7 @@ public:
 	variant& operator = (const T& data)
 	{
 		using ValueT = std::remove_reference_t<T>;
-		if (static_cast<void*>(std::addressof(this->m_data))
-			== static_cast<void*>(std::addressof(data)))
+		if (static_cast<void*>(std::addressof(this->m_data)) == static_cast<void*>(std::addressof(data)))
 			return *this;
 		reset();
 		m_type_index = index_of<T>::value;
@@ -190,7 +249,8 @@ public:
 	/* compiler-dependent stuff */
 	std::string which() const
 	{
-		return visit([](auto& value) {
+		return visit([](auto& value)
+		{
 			int status;
 			std::unique_ptr<char> name { abi::__cxa_demangle(typeid(std::decay_t<decltype(value)>).name(), 0, 0, &status) };
 			std::string res { name.get() };
@@ -210,7 +270,7 @@ public:
 			std::string res { name.get() };
 			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
 		}
-		return reinterpret_cast<T&>(*(reinterpret_cast<char*>(m_data)));
+		return *(reinterpret_cast<T*>(m_data));
 	}
 
 	template<typename T>
@@ -283,7 +343,7 @@ public:
 
 	void reset()
 	{
-		if ( m_type_index >= 0 )
+		if (m_type_index >= 0)
 		{
 			visit([](auto& value) {
 				using ValueT = std::remove_reference_t<decltype(value)>;
@@ -298,6 +358,8 @@ public:
 	{
 		if (m_type_index < 0)  [[unlikely]]
 			corecpp::throws<corecpp::bad_access>("valueless");
+		if (m_type_index >= size)  [[unlikely]]
+			corecpp::throws<corecpp::bad_access>("invalid index!"); //should not happen, unless something mess-up the memory
 		variant_apply<const variant<TArgs...>, sizeof...(TArgs) - 1, VisitorT, ArgsT...> applier;
 		return applier(*this, std::forward<VisitorT>(visitor), std::forward<ArgsT>(args)...);
 	}
@@ -307,6 +369,8 @@ public:
 	{
 		if (m_type_index < 0)  [[unlikely]]
 			corecpp::throws<corecpp::bad_access>("valueless");
+		if (m_type_index >= size)  [[unlikely]]
+			corecpp::throws<corecpp::bad_access>("invalid index!"); //should not happen, unless something mess-up the memory
 		variant_apply<variant<TArgs...>, sizeof...(TArgs) - 1, VisitorT, ArgsT...> applier;
 		return applier(*this, std::forward<VisitorT>(visitor), std::forward<ArgsT>(args)...);
 	}
