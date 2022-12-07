@@ -78,7 +78,7 @@ expected<unsigned int, std::invalid_argument> command_line_parser::parse_options
 			logger().trace(corecpp::concat<std::string>({"option ", param, " [", value, "]"}), __FILE__, __LINE__);
 			auto option = get_option(param);
 			if (option == m_options.end())
-				return std::invalid_argument { corecpp::concat<std::string>({ "--", param, ": unknow option" }) };
+				return std::invalid_argument { corecpp::concat<std::string>({ "--", param, ": unknown option" }) };
 			++read_options;
 			if (!value.empty())
 			{
@@ -105,7 +105,7 @@ expected<unsigned int, std::invalid_argument> command_line_parser::parse_options
 				char shortname = *iter;
 				auto option = get_option(shortname);
 				if (option == m_options.end())
-					return std::invalid_argument { corecpp::concat<std::string>({ "-", std::string { 1, shortname }, ": unknow option" }) };
+					return std::invalid_argument { corecpp::concat<std::string>({ "-", std::string { 1, shortname }, ": unknown option" }) };
 				++read_options;
 				++iter;
 				if (iter == param.end())
@@ -129,14 +129,17 @@ expected<unsigned int, std::invalid_argument> command_line_parser::parse_options
 	return read_options;
 }
 
+
 void command_line_parser::usage()
 {
-	std::cout << graphic_rendition_v<sgr_p::fg_yellow> << "Usage: \n\t" << graphic_rendition_v<sgr_p::all_off>
+	//TODO: check if stdout isatty?
+	std::cout << graphic_rendition_v<sgr_p::fg_yellow> << "Usage: \n  "
+			<< graphic_rendition_v<sgr_p::fg_cyan>
 			<< m_command_line.program() << m_command_line.commands();
 	if (m_options.size() > 0)
 		std::cout << " [<options>]";
 	if (m_commands.size() > 0)
-		std::cout << " <command>";
+		std::cout << " <commands>";
 	for (const auto& param : m_params)
 	{
 		if (param.is_required())
@@ -144,6 +147,7 @@ void command_line_parser::usage()
 		else
 			std::cout << " [<" << param.name() << ">]";
 	}
+	std::cout << graphic_rendition_v<sgr_p::all_off>;
 
 	if (m_options.size() > 0)
 	{

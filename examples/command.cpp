@@ -88,12 +88,12 @@ int main(int argc, char** argv)
 	bool show_help = false;
 	std::vector<std::string> dummy {};
 
-	corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::debug);
+	// corecpp::diagnostic::manager::default_channel().set_level(corecpp::diagnostic::diagnostic_level::debug);
 	corecpp::command_line args { argc, argv };
 	corecpp::command_line_parser commands { args };
 	commands.add_options(
-		corecpp::program_option { 'v', "verbose", "enable verbose", verbosity },
-		corecpp::program_option { 'h', "help", "show help message", show_help }
+		corecpp::program_option { 'v', "verbose", "Enable verbose", verbosity },
+		corecpp::program_option { 'h', "help", "Show help message", show_help }
 	);
 	commands.add_commands(
 		corecpp::program_command { "add", "Add 2 values then write the result", add },

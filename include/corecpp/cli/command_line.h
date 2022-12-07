@@ -20,6 +20,7 @@
 
 #include <corecpp/serialization/common.h>
 
+#include <corecpp/cli/graphics.h>
 #include <corecpp/cli/parser.h>
 
 /* TODO: Manage options groups
@@ -27,6 +28,14 @@
 
 namespace corecpp
 {
+
+	namespace
+	{
+		static constexpr std::string::size_type helpmsg_indent = 32;
+		static constexpr std::string::size_type min_indent = 2;
+		static constexpr std::string::size_type shortoptionmsg_len = sizeof("  -x value") - 1;
+		static constexpr std::string::size_type optionmsg_len = sizeof("  -x value, --=value") - 1;
+	};
 
 	/**
 	 * \brief interface used for reading command_line option
@@ -47,6 +56,7 @@ namespace corecpp
 		virtual void read(long_option_parser& parser) const = 0;
 		virtual void read(argument_parser& parser) const = 0;
 		virtual bool use_default() const = 0;
+		virtual bool require_value() const = 0;
 	};
 
 	/**
@@ -54,7 +64,7 @@ namespace corecpp
 	 * require T to define the '>>' operator
 	 */
 	template <typename T, typename Enable = void>
-	class generic_option : public option_reader
+	class generic_option final : public option_reader
 	{
 		T& m_value;
 		std::optional<T> m_default = std::nullopt;
@@ -88,13 +98,17 @@ namespace corecpp
 			m_value = m_default.value();
 			return true;
 		}
+		bool require_value() const override
+		{
+			return true;
+		}
 	};
 
 	/**
 	 * \brief specialization for boolean. Will return true if the option is present without a value
 	 */
 	template <typename T>
-	class generic_option<T, std::enable_if_t<std::is_same_v<T, bool>>> : public option_reader
+	class generic_option<T, std::enable_if_t<std::is_same_v<T, bool>>> final : public option_reader
 	{
 		bool& m_value;
 		bool m_default = true;
@@ -128,6 +142,10 @@ namespace corecpp
 			m_value = m_default;
 			return true;
 		}
+		bool require_value() const override
+		{
+			return false;
+		}
 	};
 
 	/**
@@ -153,7 +171,16 @@ namespace corecpp
 		}
 		std::string helpmsg() const
 		{
-			return corecpp::concat<std::string>({ "\t", m_name, "\t", m_helpmsg });
+			if (m_name.length() > (shortoptionmsg_len - min_indent))
+			{
+				std::string::size_type spaces = shortoptionmsg_len + min_indent;
+				return corecpp::concat<std::string>({ "  ", m_name, "\n", std::string(spaces, ' '), m_helpmsg });
+			}
+			else
+			{
+				std::string::size_type spaces = shortoptionmsg_len - m_name.length();
+				return corecpp::concat<std::string>({ "  ", m_name, std::string(spaces, ' '), m_helpmsg });
+			}
 		}
 		bool is_required() const
 		{
@@ -191,6 +218,11 @@ namespace corecpp
 		: m_shortname(shortname), m_name(name), m_helpmsg(helpmsg), m_reader(new generic_option<T>(value, def))
 		{
 		}
+		/*TODO:
+		template <typename T>
+		program_option(program_option_builder&& builder)
+		{}
+		*/
 		program_option& operator = (program_option&&) = default;
 
 		bool match(const std::string& name) const
@@ -215,12 +247,61 @@ namespace corecpp
 		}
 		std::string helpmsg() const
 		{
-			if (!m_shortname)
-				return corecpp::concat<std::string>({ "\t    --", m_name, "\t", m_helpmsg });
+			static constexpr std::string::size_type indent = helpmsg_indent - optionmsg_len;
+
+			if (m_reader->require_value())
+			{
+				if (m_name.length() > (indent - min_indent))
+				{
+					if (!m_shortname)
+						return corecpp::concat<std::string>({ "            --", m_name, "=value\n",
+							std::string(helpmsg_indent, ' '), m_helpmsg });
+					else
+						return corecpp::concat<std::string>({ "  -", std::string(1, m_shortname),  " value, --", m_name, "=value\n",
+							std::string(helpmsg_indent, ' '), m_helpmsg });
+				}
+				else
+				{
+					std::string::size_type spaces = indent - m_name.length();
+					if (!m_shortname)
+						return corecpp::concat<std::string>({ "            --", m_name, "=value", std::string(spaces, ' '), m_helpmsg });
+					else
+						return corecpp::concat<std::string>({ "  -", std::string(1, m_shortname),  " value, --", m_name, "=value",
+							std::string(spaces, ' '), m_helpmsg });
+				}
+			}
 			else
-				return corecpp::concat<std::string>({ "\t-", std::string(1, m_shortname),  ", --", m_name, "\t", m_helpmsg });
+			{
+				if (m_name.length() > (indent - min_indent))
+				{
+					if (!m_shortname)
+						return corecpp::concat<std::string>({ "            --", m_name, "\n",
+							std::string(helpmsg_indent, ' '), m_helpmsg });
+					else
+						return corecpp::concat<std::string>({ "  -", std::string(1, m_shortname),  ",       --", m_name, "\n",
+							std::string(helpmsg_indent, ' '), m_helpmsg });
+				}
+				else
+				{
+					std::string::size_type spaces = indent - m_name.length();
+					spaces += sizeof("=value") - 1;
+					if (!m_shortname)
+						return corecpp::concat<std::string>({ "            --", m_name, std::string(spaces, ' '), m_helpmsg });
+					else
+						return corecpp::concat<std::string>({ "  -", std::string(1, m_shortname),  ",       --", m_name,
+							std::string(spaces, ' '), m_helpmsg });
+				}
+			}
 		}
 	};
+
+	/* TODO
+	 template <typename T>
+	 program_option_builder&& make_option(char shortname, std::string name, T& value)
+	 {
+		return program_option_builder<T> { shortname, name, new generic_option<T>(value)) };
+	 }
+	 */
 
 	/**
 	 * \brief container which is intented to group multiple options togheter
@@ -264,7 +345,16 @@ namespace corecpp
 		}
 		std::string helpmsg() const
 		{
-			return corecpp::concat<std::string>({ "\t", m_name, "\t", m_helpmsg });
+			if (m_name.length() > (shortoptionmsg_len - min_indent))
+			{
+				std::string::size_type spaces = shortoptionmsg_len + min_indent;
+				return corecpp::concat<std::string>({ "  ", m_name, "\n", std::string(spaces, ' '), m_helpmsg });
+			}
+			else
+			{
+				std::string::size_type spaces = shortoptionmsg_len - m_name.length();
+				return corecpp::concat<std::string>({ "  ", m_name, std::string(spaces, ' '), m_helpmsg });
+			}
 		}
 	};
 
@@ -319,6 +409,14 @@ namespace corecpp
 			add_option(std::forward<program_option>(descriptor));
 			add_options(std::forward<Args>(values)...);
 		}
+		/*TODO:
+		template <typename... Args>
+		void add_options(program_option_builder&& builder, Args&&... values)
+		{
+			add_option(std::forward<program_option_builder>(descriptor));
+			add_options(std::forward<Args>(values)...);
+		}
+		*/
 
 		void add_command(const std::string& name, const std::string& helpmsg, std::function<int(command_line&)> func)
 		{
