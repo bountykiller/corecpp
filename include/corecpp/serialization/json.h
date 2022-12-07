@@ -91,12 +91,12 @@ namespace corecpp::json
 		: m_buffer(buffer), m_locale(m_buffer.getloc())
 		{}
 		/**
-			* \brief extract the next token
-			* \return a pointer to the next token, or an empty unique_ptr if no more token to read.
-			* \remark if the next token read doesn't require to read all the parameter, the unread characters are still
-			* reachable through the reminder method
-			* TODO: Use optional once they are available
-			*/
+		 * \brief extract the next token
+		 * \return a pointer to the next token, or an empty unique_ptr if no more token to read.
+		 * \remark if the next token read doesn't require to read all the parameter, the unread characters are still
+		 * reachable through the reminder method
+		 * TODO: Use optional once they are available
+		 */
 		std::unique_ptr<token> next();
 		/**
 			* \brief get the unread chars
@@ -295,6 +295,10 @@ namespace corecpp::json
 	{
 		bool eaten;
 		corecpp::variant<std::nullptr_t, rule> next_rule = nullptr;
+		shift_result(const shift_result&) = delete;
+		shift_result(shift_result&&) = default;
+		shift_result& operator = (const shift_result&) = delete;
+		shift_result& operator = (shift_result&&) = default;
 	};
 
 

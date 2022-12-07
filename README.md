@@ -12,7 +12,8 @@ Serialization/deserialization framework\
 Allows to serialize/deserialize raw structures/class by just listing their properties.\
 It is also possible to provide his own serialisation/deserialisation methods instead.\
 \
-Right now only JSON is supported, but the API is designed so that other format may be added in the future.
+Right now only JSON is fully supported (Xml is supported only for serialisation) but the API is designed so that other format may be added in the future.
+
 
 ### diagnostics
 Logging framework, suppport up to 8 levels from fatal to debug.\
@@ -51,6 +52,7 @@ These tests are divised into unit tests, which are divised into tests fixtures, 
 implementing tests or several tests cases. \
  \
 In the end, this model allows an easy, yet efficient, implementation of unit tests.
+(The library itself implements unit-testing through this framework)
 
 
 ## In-progress
@@ -59,4 +61,13 @@ Lib for manipulating universally unique identifier
 
 ### shared_vector
 A vector whose list of elements can be efficiently shared
+
+## Sources Tree
+The sources are divided into several directories:
+* exemples: Some programs using the corecpp library
+* include: Headers of the library
+* src: sources files of the libray
+* tests: Unit tests, may be ran using `make test`
+
+
 

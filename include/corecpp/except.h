@@ -93,7 +93,7 @@ namespace corecpp
 	};
 
 	template<typename ExceptionT, typename... ArgsT>
-	[[ noreturn ]] ExceptionT throws(ArgsT&&... args)
+	[[ noreturn ]] ExceptionT throws (ArgsT&&... args)
 	{
 		throw ExceptionT { std::forward<ArgsT>(args)... };
 	}

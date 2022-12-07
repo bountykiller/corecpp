@@ -105,15 +105,15 @@ class test_json_serialization final : public test_fixture
 	{
 		return run(cases, [&](const auto& t){
 			typename T::test_type::value_type value;
+
 			std::ostringstream oss;
 			corecpp::json::serializer serializer { oss };
-			std::istringstream iss { t.str };
-			corecpp::json::deserializer deserializer { iss };
-
 			oss = std::ostringstream();
 			serializer.serialize(t.native);
 			assert_equal(oss.str(), t.str);
 
+			std::istringstream iss { t.str };
+			corecpp::json::deserializer deserializer { iss };
 			deserializer.deserialize(value);
 			assert_equal(value, t.native);
 		});

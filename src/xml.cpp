@@ -25,9 +25,6 @@ corecpp::diagnostic::event_producer& xml_logger()
 	return logger;
 }
 
-
-
-
 void serializer::convert_and_escape(const std::string& value)
 {
 	 for(size_t pos = 0; pos != value.size(); ++pos)

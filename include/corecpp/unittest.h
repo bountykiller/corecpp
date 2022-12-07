@@ -168,6 +168,8 @@ namespace corecpp
 			bool res = op(actual, expected);
 			if (!res)
 				register_failure(actual, expected);
+			else
+				logger().success("", [this]{ return corecpp::concat<std::string>({"Success at index ", std::to_string(m_current_test_index)}); }, __FILE__, __LINE__);
 		}
 
 		template <typename T, template<typename U> class Op>
@@ -190,6 +192,8 @@ namespace corecpp
 
 				corecpp::throws<assertion_error>(oss.str());
 			}
+			else
+				logger().success("", [this]{ return corecpp::concat<std::string>({"Success at index ", std::to_string(m_current_test_index)}); }, __FILE__, __LINE__);
 		}
 
 	protected:
