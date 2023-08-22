@@ -587,7 +587,7 @@ namespace corecpp::json
 
 	/**
 	* \brief class used to deserialize a stream formatted into json
-	* \implements deserialiser concept
+	* \implements deserializer concept
 	*/
 	class deserializer
 	{
