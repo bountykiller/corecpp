@@ -242,6 +242,20 @@ public:
 		return run_tests(cases);
 	}
 
+	test_case_result test_variant() const
+	{
+		using variant_type = corecpp::variant<int, double, std::string>;
+		test_cases<type_test<variant_type>> cases {
+			{ { }, "{\"-1\":null}" },
+			{ { 1 }, "{\"0\":1}" },
+			{ { -1.1 }, "{\"1\":-1.1}" },
+			{ std::string { "test" }, "{\"2\":\"test\"}" },
+			{ std::string { "" }, "{\"2\":\"\"}" },
+		};
+
+		return run_tests(cases);
+	}
+
 public:
 	tests_type tests() const override
 	{
@@ -254,6 +268,7 @@ public:
 			{ "structured_types", [&] () { return test_structured_types(); } },
 			{ "complex_types", [&] () { return test_complex_types(); } },
 			{ "array_types", [&] () { return test_array_types(); } },
+			{ "variant", [&] () { return test_variant(); } },
 		};
 	}
 };

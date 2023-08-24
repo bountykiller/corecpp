@@ -241,6 +241,22 @@ public:
 		return m_data < other.m_data;
 	}
 
+	template<typename T>
+	bool operator == (const T& other) const
+	noexcept(noexcept(other == other))
+	{
+		if ( m_type_index != index_of<T>::value )
+			return false;
+		return (*(reinterpret_cast<const T*>(m_data))) == other;
+	}
+
+	bool operator == (const variant& other) const
+	{
+		if (valueless())
+			return other.valueless();
+		return visit([&](auto &&a) { return other == a; });
+	}
+
 	int index() const
 	{
 		return m_type_index;
@@ -270,7 +286,7 @@ public:
 			std::string res { name.get() };
 			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
 		}
-		return *(reinterpret_cast<T*>(m_data));
+		return *(reinterpret_cast<T*>(&m_data));
 	}
 
 	template<typename T>
@@ -285,7 +301,7 @@ public:
 			std::string res { name.get() };
 			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
 		}
-		return *(reinterpret_cast<const T*>(m_data));
+		return *(reinterpret_cast<const T*>(&m_data));
 	}
 
 	template<typename T, typename ArgT>
@@ -390,18 +406,32 @@ public:
 	template <typename SerializerT>
 	void serialize(SerializerT& s) const
 	{
-		s.template begin_array<this_type>();
-		s.write_element(m_type_index);
-		visit([&s](auto&& value){ s.write_element(value); });
-		s.end_array();
+		if (!valueless())
+			s.write_property_cb(std::to_string(m_type_index),
+								[&] { visit([&s](auto&& value){ s.write_element(value); }); });
+		else
+			s.write_property("-1", nullptr);
 	}
 	template <typename DeserializerT>
 	void deserialize(DeserializerT& d, const std::string& property)
 	{
-		d.template begin_array<this_type>();
-		d.read_element(m_type_index);
-		visit([&d](auto&& value){ d.read_element(value); });
-		d.end_array();
+		/* TODO handle the case we're not in valueless state */
+		if (!valueless())
+			corecpp::throws<corecpp::bad_access>("should be in valueless state");
+		m_type_index = std::stoi(property);
+		if (m_type_index >= 0)
+		{
+			visit([&d](auto&& value){
+				using ValueT = std::remove_reference_t<decltype(value)>;
+				new (&value) ValueT; /* default-initailize m_data to avoid having an incorrect variable */
+				d.read_element(value);
+			});
+		}
+		else
+		{
+			std::nullptr_t tmp;
+			d.read_element(tmp);
+		}
 	}
 };
 

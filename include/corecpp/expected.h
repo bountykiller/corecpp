@@ -12,7 +12,8 @@ namespace corecpp
 	{
 		using value_type = corecpp::variant<T, ErrT>;
 		value_type m_value;
-		friend std::ostream& operator << (std::ostream& os, const expected<T, ErrT>& e);
+		template <typename U, typename ErrU>
+		friend std::ostream& operator << (std::ostream& os, const expected<U, ErrU>& e);
 	public:
 		expected() = delete; /* no default ctor */
 
@@ -58,7 +59,7 @@ namespace corecpp
 	template <typename T, typename ErrT>
 	std::ostream& operator << (std::ostream& os, const expected<T, ErrT>& e)
 	{
-		e.apply([&os](auto x) { os << x; });
+		return e.apply([&os](auto x) { return os << x; });
 	}
 
 }
