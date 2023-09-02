@@ -74,13 +74,15 @@ public:
 	template<size_t index> using type_at_t = typename type_at<index>::type;
 
 	/* TODO */
-	static inline bool has_reference = corecpp::all_type<std::is_reference, TArgs...>::value;
+	static constexpr bool has_reference = corecpp::all_type<std::is_reference, TArgs...>::value;
 	static constexpr bool is_move_constructible = corecpp::all_type<std::is_move_constructible, TArgs...>::value;
 	static constexpr bool is_nothrow_move_constructible = corecpp::all_type<std::is_nothrow_move_constructible, TArgs...>::value;
 	static constexpr bool is_copy_constructible = corecpp::all_type<std::is_copy_constructible, TArgs...>::value;
 	static constexpr bool is_nothrow_copy_constructible = corecpp::all_type<std::is_nothrow_copy_constructible, TArgs...>::value;
 	static constexpr bool is_move_assignable = corecpp::all_type<std::is_move_assignable, TArgs...>::value;
 	static constexpr bool is_copy_assignable = corecpp::all_type<std::is_copy_assignable, TArgs...>::value;
+	static constexpr bool is_nothrow_destructible = corecpp::all_type<std::is_nothrow_destructible, TArgs...>::value;
+	static constexpr bool is_nothrow_equality_comparable = corecpp::all_type<corecpp::is_nothrow_equality_comparable, TArgs...>::value;
 	static constexpr size_t size = sizeof...(TArgs);
 
 	/* Here the behaviour differs from STL.
@@ -241,6 +243,13 @@ public:
 		return m_data < other.m_data;
 	}
 
+	bool operator <= (const variant& other) const
+	{
+		if (m_type_index != other.m_type_index)
+			return m_type_index < other.m_type_index;
+		return m_data <= other.m_data;
+	}
+
 	template<typename T>
 	bool operator == (const T& other) const
 	noexcept(noexcept(other == other))
@@ -251,13 +260,14 @@ public:
 	}
 
 	bool operator == (const variant& other) const
+	noexcept(is_nothrow_equality_comparable)
 	{
 		if (valueless())
 			return other.valueless();
 		return visit([&](auto &&a) { return other == a; });
 	}
 
-	int index() const
+	constexpr int index() const noexcept
 	{
 		return m_type_index;
 	}
@@ -275,37 +285,87 @@ public:
 	}
 
 	template<typename T>
-	T& get()
+	constexpr T& get()
 	{
 		if (m_type_index != index_of<T>::value)  [[unlikely]]
 		{
 			if (m_type_index < 0)
 				corecpp::throws<corecpp::bad_access>("valueless");
-			int status;
-			std::unique_ptr<char> name { abi::__cxa_demangle(typeid(std::decay_t<T>).name(), 0, 0, &status) };
-			std::string res { name.get() };
-			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
+			visit([](auto& value)
+			{
+				corecpp::throws<corecpp::bad_type_access<T, decltype(value)>>("");
+			});
 		}
 		return *(reinterpret_cast<T*>(&m_data));
 	}
 
 	template<typename T>
-	const T& get() const
+	constexpr const T& get() const
 	{
 		if (m_type_index != index_of<T>::value)  [[unlikely]]
 		{
 			if (m_type_index < 0)
 				corecpp::throws<corecpp::bad_access>("valueless");
-			int status;
-			std::unique_ptr<char> name { abi::__cxa_demangle(typeid(std::decay_t<T>).name(), 0, 0, &status) };
-			std::string res { name.get() };
-			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
+			visit([](auto& value)
+			{
+				corecpp::throws<corecpp::bad_type_access<T, decltype(value)>>("");
+			});
 		}
 		return *(reinterpret_cast<const T*>(&m_data));
 	}
 
+	template<uint pos>
+	constexpr typename type_at<pos>::type& get()
+	{
+		if (m_type_index != pos)  [[unlikely]]
+		{
+			if (m_type_index < 0)
+				corecpp::throws<corecpp::bad_access>("valueless");
+			visit([](auto& value)
+			{
+				corecpp::throws<corecpp::bad_type_access<type_at_t<pos>, decltype(value)>>("");
+			});
+		}
+		return get<typename type_at<pos>::type>(m_data);
+	}
+
+	template<uint pos>
+	constexpr const typename type_at<pos>::type& get() const
+	{
+		if (m_type_index != pos)  [[unlikely]]
+		{
+			if (m_type_index < 0)
+				corecpp::throws<corecpp::bad_access>("valueless");
+			visit([](auto& value)
+			{
+				corecpp::throws<corecpp::bad_type_access<type_at_t<pos>, decltype(value)>>("");
+			});
+		}
+		return get<const typename type_at<pos>::type>(m_data);
+	}
+
+	template<typename T>
+	constexpr const T* get_if() const noexcept
+	{
+		if (m_type_index != index_of<T>::value)  [[unlikely]]
+		{
+			return nullptr;
+		}
+		return (reinterpret_cast<const T*>(&m_data));
+	}
+
+	template<typename T>
+	constexpr T* get_if() noexcept
+	{
+		if (m_type_index != index_of<T>::value)  [[unlikely]]
+		{
+			return nullptr;
+		}
+		return (reinterpret_cast<T*>(&m_data));
+	}
+
 	template<typename T, typename ArgT>
-	variant& set (ArgT&& arg)
+	constexpr T& emplace (ArgT&& arg)
 	{
 		using ValueT = std::remove_reference_t<T>;
 		if (static_cast<const void*>(std::addressof(this->m_data))
@@ -314,50 +374,21 @@ public:
 		reset();
 		m_type_index = index_of<T>::value;
 		new (m_data) ValueT(std::forward<ArgT>(arg));
-		return *this;
+		return *(reinterpret_cast<const T*>(&m_data));
 	}
 
 	template<typename T, typename... ArgsT>
-	variant& set (ArgsT&&... args)
+	constexpr T& emplace (ArgsT&&... args)
 	{
 		using ValueT = std::remove_reference_t<T>;
 		reset();
 		m_type_index = index_of<T>::value;
 		new (m_data) ValueT(std::forward<ArgsT>(args)...);
-		return *this;
-	}
-
-	template<uint pos>
-	typename type_at<pos>::type& at()
-	{
-		if (m_type_index != pos)  [[unlikely]]
-		{
-			if (m_type_index < 0)
-				corecpp::throws<corecpp::bad_access>("valueless");
-			int status;
-			std::unique_ptr<char> name { abi::__cxa_demangle(typeid(std::decay_t<type_at_t<pos>>).name(), 0, 0, &status) };
-			std::string res { name.get() };
-			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
-		}
-		return get<typename type_at<pos>::type>(m_data);
-	}
-
-	template<uint pos>
-	const typename type_at<pos>::type& at() const
-	{
-		if (m_type_index != pos)  [[unlikely]]
-		{
-			if (m_type_index < 0)
-				corecpp::throws<corecpp::bad_access>("valueless");
-			int status;
-			std::unique_ptr<char> name { abi::__cxa_demangle(typeid(std::decay_t<type_at_t<pos>>).name(), 0, 0, &status) };
-			std::string res { name.get() };
-			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
-		}
-		return get<const typename type_at<pos>::type>(m_data);
+		return *(reinterpret_cast<const T*>(&m_data));
 	}
 
 	void reset()
+	noexcept(is_nothrow_destructible)
 	{
 		if (m_type_index >= 0)
 		{
@@ -415,9 +446,7 @@ public:
 	template <typename DeserializerT>
 	void deserialize(DeserializerT& d, const std::string& property)
 	{
-		/* TODO handle the case we're not in valueless state */
-		if (!valueless())
-			corecpp::throws<corecpp::bad_access>("should be in valueless state");
+		reset();
 		m_type_index = std::stoi(property);
 		if (m_type_index >= 0)
 		{

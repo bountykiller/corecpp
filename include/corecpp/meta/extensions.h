@@ -1,6 +1,7 @@
 #ifndef CORECPP_EXTENSIONS_H
 #define CORECPP_EXTENSIONS_H
 
+#include <functional>
 #include <tuple>
 #include <type_traits>
 #include <corecpp/meta/reflection.h>
@@ -50,41 +51,51 @@ using pvalue = typename std::add_pointer<typename type_resolver<T>::type>::type;
 template<typename T>
 using concrete = typename type_resolver<T>::type;
 
+/* std::equal_to does not follow noexcept specification, so this class is needed  */
+template<typename T>
+struct is_equal
+{
+	constexpr bool operator()(const T &lhs, const T &rhs) const noexcept(noexcept(lhs == rhs))
+	{
+		return lhs == rhs;
+	}
+};
+
 /**
  * @brief allows to know if a type is an strongly-typed enum
  * @note will be obsolete in c++23, see std::is_scoped_enum
  */
 template<typename T, typename Enable = void>
-struct is_strong_enum
+struct is_strong_enum final
+: public std::false_type
 {
-	static constexpr bool value = false;
 };
 
 template<typename T>
 struct is_strong_enum<T, std::enable_if_t<std::is_enum_v<T>
 	&& !std::is_constructible_v<std::underlying_type_t<T>, T>
-	>>
+	>> final
+: public std::true_type
 {
-	static constexpr bool value = true;
 };
 
 /**
  * @brief allows to know if a class can be browsed through an iterator
  */
 template<typename T, typename Enable = void>
-struct is_iterable
+struct is_iterable final
+: public std::false_type
 {
-	static constexpr bool value = false;
 };
 
 template<typename T>
-struct is_iterable<T, std::enable_if_t<!std::is_void<typename T::iterator>::value>>
+struct is_iterable<T, std::enable_if_t<!std::is_void<typename T::iterator>::value>> final
+: public std::true_type
 {
 	/* NOTE:
 	 * the real thing to do here would be to tests if a given type is a Container (using the Container concept)
 	 * But that's way to much work for my needs...
 	 */
-	static constexpr bool value = true;
 };
 
 
@@ -92,16 +103,16 @@ struct is_iterable<T, std::enable_if_t<!std::is_void<typename T::iterator>::valu
  * @brief allows to know if a class is an associative container
  */
 template<typename T, typename Enable = void>
-struct is_associative
+struct is_associative final
+: public std::false_type
 {
-	static constexpr bool value = false;
 };
 
 template<typename T>
 struct is_associative<T, std::enable_if_t<!std::is_void<typename T::key_type>::value
-	&& !std::is_void<typename T::mapped_type>::value>>
+	&& !std::is_void<typename T::mapped_type>::value>> final
+: public std::true_type
 {
-	static constexpr bool value = true;
 };
 
 template<typename T>
@@ -113,22 +124,22 @@ inline constexpr bool is_associative_v = is_associative<T>::value;
  * TODO: is_dereferencable should also be convertible to bool
  */
 template<typename T, typename Enable = void>
-struct is_dereferencable
+struct is_dereferencable final
+: public std::false_type
 {
-	static constexpr bool value = false;
 };
 template<typename T>
-struct is_dereferencable<T, std::enable_if_t<std::is_pointer<T>::value>>
+struct is_dereferencable<T, std::enable_if_t<std::is_pointer<T>::value>> final
+: public std::true_type
 {
-	static constexpr bool value = true;
 };
 template<typename T>
 struct is_dereferencable<T, std::enable_if_t<
 	std::is_reference_v<decltype(static_cast<T*>(nullptr)->operator*())>
 	&& std::is_pointer_v<decltype(static_cast<T*>(nullptr)->operator->())>
-	>>
+	>> final
+: public std::true_type
 {
-	static constexpr bool value = true;
 };
 
 template<typename T>
@@ -136,19 +147,61 @@ inline constexpr bool is_dereferencable_v = is_dereferencable<T>::value;
 
 
 /**
+ * @brief allows to know if a class can be compared for equality
+ */
+template<typename T, typename Enable = void>
+struct is_equality_comparable final
+: public std::false_type
+{
+};
+
+template<typename T>
+struct is_equality_comparable<T,
+std::enable_if_t<std::is_same<bool, std::invoke_result_t<corecpp::is_equal<T>, const T&, const T&>>::value>> final
+: public std::true_type
+{
+};
+
+template<typename T>
+inline constexpr bool is_equality_comparable_v = is_equality_comparable<T>::value;
+
+
+/**
+ * @brief allows to know if a class can be compared for equality without throwing
+ */
+template<typename T, typename Enable = void>
+struct is_nothrow_equality_comparable final
+: public std::false_type
+{
+};
+
+template<typename T>
+struct is_nothrow_equality_comparable<T,
+	std::enable_if_t<corecpp::is_equality_comparable<T>::value
+	&& std::is_nothrow_invocable<corecpp::is_equal<T>, const T&, const T&>::value
+	>> final
+: public std::true_type
+{
+};
+
+template<typename T>
+inline constexpr bool is_nothrow_equality_comparable_v = is_equality_comparable<T>::value;
+
+
+/**
  * @brief allows to know if a class is a visitable (typically variant)
  */
 template<typename T, typename VisitorT, typename Enable = void>
-struct is_visitable
+struct is_visitable final
+: public std::false_type
 {
-	static constexpr bool value = false;
 };
 
 template<typename T, typename VisitorT>
 struct is_visitable<T, VisitorT,
-	std::enable_if_t<std::is_member_function_pointer<decltype(&T::valueless_by_exception)>::value>>
+std::enable_if_t<std::is_member_function_pointer<decltype(&T::valueless_by_exception)>::value>> final
+: public std::true_type
 {
-	static constexpr bool value = true;
 };
 
 template<typename T, typename V>
@@ -159,9 +212,9 @@ inline constexpr bool is_visitable_v = is_visitable<T,V>::value;
  * @brief allows to know if a class represent a point in time
  */
 template<typename T, typename Enable = void>
-struct is_time_point
+struct is_time_point final
+: public std::false_type
 {
-	static constexpr bool value = false;
 };
 
 template<typename T>
@@ -171,9 +224,9 @@ struct is_time_point<T,
 	&& std::is_class<typename T::duration>::value
 	&& std::is_class<typename T::clock>::value
 	&& std::is_member_function_pointer<decltype(&T::time_since_epoch)>::value
-	>>
+	>> final
+	: public std::true_type
 {
-	static constexpr bool value = true;
 };
 
 template<typename T>
