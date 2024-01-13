@@ -308,6 +308,12 @@ public:
 	template<typename T>
 	const T& c_get() const
 	{
+		return c_get<T>();
+	}
+
+	template<typename T>
+	constexpr const T& c_get() const
+	{
 		if (m_type_index != index_of<T>::value)  [[unlikely]]
 		{
 			if (m_type_index < 0)
