@@ -170,22 +170,26 @@ inline constexpr bool is_equality_comparable_v = is_equality_comparable<T>::valu
  * @brief allows to know if a class can be compared for equality without throwing
  */
 template<typename T, typename Enable = void>
-struct is_nothrow_equality_comparable final
+struct is_nothrow_equality_comparable_impl
 : public std::false_type
 {
 };
 
 template<typename T>
-struct is_nothrow_equality_comparable<T,
+struct is_nothrow_equality_comparable_impl<T,
 	std::enable_if_t<corecpp::is_equality_comparable<T>::value
 	&& std::is_nothrow_invocable<corecpp::is_equal<T>, const T&, const T&>::value
-	>> final
+	>>
 : public std::true_type
 {
 };
 
 template<typename T>
-inline constexpr bool is_nothrow_equality_comparable_v = is_equality_comparable<T>::value;
+struct is_nothrow_equality_comparable final : public is_nothrow_equality_comparable_impl<T>
+{};
+
+template<typename T>
+inline constexpr bool is_nothrow_equality_comparable_v = is_nothrow_equality_comparable<T>::value;
 
 
 /**

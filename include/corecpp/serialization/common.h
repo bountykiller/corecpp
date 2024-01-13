@@ -99,7 +99,10 @@ namespace corecpp
 	};
 	template <typename SerializerT, typename ValueT>
 	struct serialize_impl<SerializerT, ValueT,
-						typename std::enable_if<is_associative<std::decay_t<ValueT>>::value>::type>
+						typename std::enable_if<
+							!is_serializable<std::decay_t<ValueT>, std::decay_t<SerializerT>>::value
+							&& is_associative<std::decay_t<ValueT>>::value>
+						::type>
 	{
 		void operator () (SerializerT& s, ValueT&& value)
 		{
@@ -108,8 +111,11 @@ namespace corecpp
 	};
 	template <typename SerializerT, typename ValueT>
 	struct serialize_impl<SerializerT, ValueT,
-						typename std::enable_if<!is_associative<std::decay_t<ValueT>>::value
-							&& is_iterable<std::decay_t<ValueT>>::value>::type>
+						typename std::enable_if<
+							!is_serializable<std::decay_t<ValueT>, std::decay_t<SerializerT>>::value
+							&& !is_associative<std::decay_t<ValueT>>::value
+							&& is_iterable<std::decay_t<ValueT>>::value>
+						::type>
 	{
 		void operator () (SerializerT& s, ValueT&& value)
 		{

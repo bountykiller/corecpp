@@ -300,16 +300,22 @@ public:
 	}
 
 	template<typename T>
-	constexpr const T& get() const
+	const T& get() const
+	{
+		return c_get<T>();
+	}
+
+	template<typename T>
+	const T& c_get() const
 	{
 		if (m_type_index != index_of<T>::value)  [[unlikely]]
 		{
 			if (m_type_index < 0)
 				corecpp::throws<corecpp::bad_access>("valueless");
-			visit([](auto& value)
-			{
-				corecpp::throws<corecpp::bad_type_access<T, decltype(value)>>("");
-			});
+			int status;
+			std::unique_ptr<char> name { abi::__cxa_demangle(typeid(std::decay_t<T>).name(), 0, 0, &status) };
+			std::string res { name.get() };
+			corecpp::throws<corecpp::bad_access>(corecpp::concat<std::string>({ res, " expected, got ", which() }));
 		}
 		return *(reinterpret_cast<const T*>(&m_data));
 	}
