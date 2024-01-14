@@ -16,85 +16,6 @@ namespace corecpp
 
 namespace
 {
-	template<typename THead, typename... TTail>
-	struct variadic;
-
-	template<typename THead>
-	struct variadic<THead>
-	{
-		typedef THead head_type;
-
-		template<typename T, size_t index = 0>
-		struct index_of
-		{
-		};
-
-		template<size_t index>
-		struct index_of<head_type, index>
-		{
-			static constexpr size_t value = index;
-		};
-
-		template<size_t index, typename TResult = head_type>
-		struct at
-		{
-		};
-
-		template<typename TResult>
-		struct at<0, TResult>
-		{
-			typedef TResult type;
-		};
-
-		static const std::type_info& type(size_t i)
-		{
-			static const std::type_info& result = typeid(head_type);
-			if(i)
-				throw std::out_of_range(std::to_string(i));
-			return result;
-		}
-	};
-
-	template<typename THead, typename... TTail>
-	struct variadic : protected variadic<TTail...>
-	{
-		typedef THead head_type;
-		typedef variadic<TTail...> tail_type;
-
-		template<typename T, size_t index = 0>
-		struct index_of
-		{
-			static constexpr size_t value = tail_type::template index_of<T>::value + 1;
-		};
-
-		template<size_t index>
-		struct index_of<head_type, index>
-		{
-			static constexpr size_t value = index;
-		};
-
-		template<size_t index, typename TResult = head_type>
-		struct at
-		{
-			typedef typename tail_type::template at<index - 1>::type type;
-		};
-
-		template<typename TResult>
-		struct at<0, TResult>
-		{
-			typedef TResult type;
-		};
-
-		static const std::type_info& type(size_t i)
-		{
-			static const std::type_info& result = typeid(head_type);
-			if(!i)
-				return result;
-			return tail_type::type(i-1);
-		}
-	};
-
-
 	template<class T, class enable = void>
 	struct type_resolver
 	{
@@ -120,10 +41,140 @@ namespace
 	};
 }
 
+
+template<typename THead, typename... TTail>
+struct typelist;
+
+template<typename THead>
+struct typelist<THead>
+{
+	using head_type = THead;
+
+	template<typename T, size_t index = 0>
+	struct index_of
+	{
+	};
+
+	template<size_t index>
+	struct index_of<head_type, index>
+	{
+		static constexpr size_t value = index;
+	};
+	template<typename T>
+	static inline constexpr auto index_of_v = index_of<T>::value;
+
+	template<size_t index, typename TResult = head_type>
+	struct at
+	{
+	};
+
+	template<typename TResult>
+	struct at<0, TResult>
+	{
+		using type = TResult;
+	};
+
+	template<typename T>
+	struct append
+	{
+		using type = typelist<T, head_type>;
+	};
+
+	template<template <typename T> class TransformerT>
+	struct transform
+	{
+		using type = typelist<TransformerT<head_type>>;
+	};
+
+	template<template <typename T> class ApplyT>
+	struct apply //TODO: find a better name
+	{
+		using type = ApplyT<head_type>;
+	};
+
+	static const std::type_info& type(size_t i)
+	{
+		static const std::type_info& result = typeid(head_type);
+		if(i)
+			throw std::out_of_range(std::to_string(i));
+		return result;
+	}
+};
+
+template<typename THead, typename... TTail>
+struct typelist : protected typelist<TTail...>
+{
+	using head_type = THead;
+	using tail_type = typelist<TTail...>;
+
+	template<typename T, size_t index = 0>
+	struct index_of
+	{
+		static constexpr size_t value = tail_type::template index_of<T>::value + 1;
+	};
+
+	template<size_t index>
+	struct index_of<head_type, index>
+	{
+		static constexpr size_t value = index;
+	};
+	template<typename T>
+	static inline constexpr auto index_of_v = index_of<T>::value;
+
+	template<size_t index, typename TResult = head_type>
+	struct at
+	{
+		using type = typename tail_type::template at<index - 1>::type;
+	};
+
+	template<typename TResult>
+	struct at<0, TResult>
+	{
+		using type = TResult;
+	};
+
+	template<typename T>
+	struct append
+	{
+		using type = typelist<T, head_type, TTail...>;
+	};
+
+	template<template <typename T> class TransformerT>
+	struct transform
+	{
+		using head = TransformerT<head_type>;
+		using tail = typename tail_type::template transform<TransformerT>::type;
+		using type = typename tail::template append<head>::type;
+	};
+
+	template<template <typename... T> class ApplyT>
+	struct apply //TODO: find a better name
+	{
+		using type = ApplyT<head_type, TTail...>;
+	};
+
+	//TODO: add the method to transform typelist<a,b,c> into std::tuple<a,b,c> for example
+
+	static const std::type_info& type(size_t i)
+	{
+		static const std::type_info& result = typeid(head_type);
+		if(!i)
+			return result;
+		return tail_type::type(i-1);
+	}
+};
+
+template<typename T>
+struct value_type
+{
+	using type = typename T::value_type;
+};
+template<typename T> using value_type_t = typename value_type<T>::type;
+
 template<typename T, typename... TArgs>
 struct type_index
 {
-	static constexpr size_t value = variadic<TArgs...>::template index_of<T>::value;
+	static constexpr size_t value = typelist<TArgs...>::template index_of<T>::value;
 };
 template<typename T, typename... TArgs>
 inline constexpr std::size_t type_index_v = type_index<T, TArgs...>::value;
@@ -131,14 +182,14 @@ inline constexpr std::size_t type_index_v = type_index<T, TArgs...>::value;
 template<size_t index, typename... TArgs>
 struct type_at
 {
-	typedef typename variadic<TArgs...>::template at<index>::type type;
+	typedef typename typelist<TArgs...>::template at<index>::type type;
 };
 template<size_t index, typename... TArgs> using type_at_t = typename type_at<index, TArgs...>::type;
 
 template<typename... TArgs>
 const std::type_info& type(size_t index)
 {
-	return variadic<TArgs...>::type(index);
+	return typelist<TArgs...>::type(index);
 }
 
 

@@ -4,7 +4,9 @@
 #include <memory>
 #include <optional>
 #include <vector>
+#include <tuple>
 #include <typeinfo>
+#include <type_traits>
 
 #include <corecpp/meta/extensions.h>
 #include <corecpp/unittest.h>
@@ -128,6 +130,26 @@ class test_reflection final : public test_fixture
 		});
 	}
 
+	test_case_result test_typelist() const
+	{
+		struct test { bool actual; };
+		test_cases<test> cases ({
+			{ std::is_same_v<corecpp::typelist<int>::at<0>::type, int> },
+			{ std::is_same_v<corecpp::typelist<int, double>::at<0>::type, int> },
+			{ std::is_same_v<corecpp::typelist<int, double>::at<1>::type, double> },
+			{ std::is_same_v<corecpp::typelist<int, double>::transform<std::vector>::type,
+			  corecpp::typelist<std::vector<int>, std::vector<double>>> },
+			{ std::is_same_v<corecpp::typelist<int>::apply<std::tuple>::type, std::tuple<int>> },
+			{ std::is_same_v<corecpp::typelist<int, double>::apply<std::tuple>::type,
+				std::tuple<int, double>> },
+
+		});
+
+		return run(cases, [&](const test& t){
+			assert_equal(t.actual, true);
+		});
+	}
+
 public:
 	tests_type tests() const override
 	{
@@ -137,7 +159,8 @@ public:
 			{ "test_is_associative", [&] () { return test_is_associative(); } },
 			{ "test_is_time_point", [&] () { return test_is_time_point(); } },
 			{ "test_is_strong_enum", [&] () { return test_is_strong_enum(); } },
-			{ "test_alltype", [&] () { return test_alltype(); } }
+			{ "test_alltype", [&] () { return test_alltype(); } },
+			{ "test_typelist", [&] () { return test_typelist(); } }
 		};
 	}
 
