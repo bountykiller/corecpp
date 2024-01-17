@@ -532,7 +532,7 @@ namespace corecpp::json
 		void write_object(ValueT&& value, const PropertiesT& properties)
 		{
 			begin_object<ValueT>();
-			tuple_apply([&](const auto& prop) {
+			tuple_foreach([&](const auto& prop) {
 				this->write_property(prop.name(), prop.cget(value));
 			}, properties);
 			end_object();
@@ -735,9 +735,9 @@ namespace corecpp::json
 		}
 		void end_object()
 		{
+			m_first = false;
 			if (m_current.index() != token::index_of<close_brace_token>::value)
 				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace token expected, got ", to_string(m_current) }));
-			read();
 		}
 
 		template <typename ValueT>
@@ -753,7 +753,6 @@ namespace corecpp::json
 			m_first = false;
 			if (m_current.index() != token::index_of<close_bracket_token>::value)
 				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close bracket token expected, got ", to_string(m_current) }));
-			read();
 		}
 		template <typename ValueT>
 		void read_element(ValueT& value)
@@ -779,6 +778,29 @@ namespace corecpp::json
 			func();
 			m_first = false;
 		}
+		template <typename FuncT>
+		void read_property_cb(FuncT func)
+		{
+			if (!m_first)
+			{
+				if (m_current.index() != token::index_of<comma_token>::value)
+					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "comma token expected, got ", to_string(m_current) }));
+				read();
+			}
+			else
+				m_first = false;
+
+			if (m_current.index() != token::index_of<string_token>::value)
+				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "string token expected, got ", to_string(m_current) }));
+			std::wstring pname = std::move(m_current.get<string_token>().value);
+
+			read();
+			if (m_current.index() != token::index_of<colon_token>::value)
+				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "colon token expected, got ", to_string(m_current) }));
+			read();
+			func(pname);
+			read();
+		}
 		template <typename ValueT>
 		void read_object(ValueT& value)
 		{
@@ -786,69 +808,51 @@ namespace corecpp::json
 			if (m_current.index() != token::index_of<open_brace_token>::value)
 				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(m_current) }));
 
-			for (read(); m_current.index() == token::index_of<string_token>::value; read())
+			begin_object<ValueT>();
+			while (m_current.index() != token::index_of<close_brace_token>::value)
 			{
-				std::string pname;
-				read_string(m_current.get<string_token>(), pname);
-				read();
-				if (m_current.index() != token::index_of<colon_token>::value)
-					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "colon token expected, got ", to_string(m_current) }));
-				read();
-				value.deserialize(*this, pname);
-				read();
-				if (m_current.index() != token::index_of<comma_token>::value)
-					break;
-			}
-			if (m_current.index() != token::index_of<close_brace_token>::value)
-				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace token expected, got ", to_string(m_current) }));
+				read_property_cb(
+					[this, &value] (const std::wstring &pname)
+					{
+						json_logger().trace("reading property", __FILE__, __LINE__);
+						value.deserialize(*this, pname);
+						json_logger().trace("property read", __FILE__, __LINE__);
+					});
+			};
+			end_object();
 			json_logger().trace("object read", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 		}
 		template <typename ValueT, typename PropertiesT>
 		void read_object(ValueT& value, const PropertiesT& properties)
 		{
 			json_logger().trace("reading object", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
-			if (m_current.index() != token::index_of<open_brace_token>::value)
-				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(m_current) }));
-
-			for (read(); m_current.index() == token::index_of<string_token>::value; read())
+			begin_object<ValueT>();
+			while (m_current.index() != token::index_of<close_brace_token>::value)
 			{
-				std::wstring pname = std::move(m_current.get<string_token>().value);
-				read();
-				if (m_current.index() != token::index_of<colon_token>::value)
-					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "colon token expected, got ", to_string(m_current) }));
-				read();
-				tuple_apply([&](const auto& prop) {
-					if (prop.name() == pname)
-						this->deserialize(prop.get(value));
-				}, properties);
-				read();
-				if (m_current.index() != token::index_of<comma_token>::value)
-					break;
-			}
-			if (m_current.index() != token::index_of<close_brace_token>::value)
-				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace expected, got ", to_string(m_current) }));
+				read_property_cb(
+					[&](const std::wstring &pname)
+					{
+						tuple_foreach(
+							[&](const auto& prop)
+							{
+								if (prop.name() == pname)
+									this->deserialize(prop.get(value));
+							}, properties);
+					});
+			};
+			end_object();
 			json_logger().trace("object read", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
 		}
+		template <typename ValueT>
 		void read_object_cb(std::function<void(const std::wstring&)> func)
 		{
-			json_logger().trace("reading object", __FILE__, __LINE__);
-			if (m_current.index() != token::index_of<open_brace_token>::value)
-				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "open brace token expected, got ", to_string(m_current) }));
-
-			for (read(); m_current.index() == token::index_of<string_token>::value; read())
+			json_logger().trace("reading object", typeid(std::decay_t<ValueT>).name(), __FILE__, __LINE__);
+			begin_object<ValueT>();
+			while (m_current.index() != token::index_of<close_brace_token>::value)
 			{
-				std::wstring pname = std::move(m_current.get<string_token>().value);
-				read();
-				if (m_current.index() != token::index_of<colon_token>::value)
-					corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "colon token expected, got ", to_string(m_current) }));
-				read();
-				func(pname);
-				read();
-				if (m_current.index() != token::index_of<comma_token>::value)
-					break;
-			}
-			if (m_current.index() != token::index_of<close_brace_token>::value)
-				corecpp::throws<corecpp::syntax_error>(corecpp::concat<std::string>({ "close brace expected, got ", to_string(m_current) }));
+				read_property_cb(func);
+			};
+			end_object();
 			json_logger().trace("object read", __FILE__, __LINE__);
 		}
 		template <typename ValueT>
@@ -896,6 +900,7 @@ namespace corecpp::json
 				read_element<MappedT>(mapped);
 				read();
 				end_object();
+				read();
 				value.emplace(std::move(key), std::move(mapped));
 				if (m_current.index() != token::index_of<comma_token>::value)
 					break;

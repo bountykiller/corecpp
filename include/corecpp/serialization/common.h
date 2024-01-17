@@ -35,7 +35,7 @@ namespace corecpp
 	template<typename T, typename DeserializerT>
 	struct is_deserializable<T, DeserializerT,
 							typename std::enable_if<
-								std::is_void<typename std::result_of<decltype(&T::template deserialize<DeserializerT>)(T, DeserializerT&, std::string&)>::type
+								std::is_void<typename std::result_of<decltype(&T::template deserialize<DeserializerT>)(T, DeserializerT&, std::wstring&)>::type
 							>::value>::type>
 	{
 		static constexpr bool value = true;
@@ -122,6 +122,29 @@ namespace corecpp
 			s.write_array(std::forward<ValueT>(value));
 		}
 	};
+	template <typename SerializerT, typename ValueT>
+	struct serialize_impl<SerializerT, ValueT,
+						typename std::enable_if<
+							!is_serializable<std::decay_t<ValueT>, std::decay_t<SerializerT>>::value
+							&& !is_associative<std::decay_t<ValueT>>::value
+							&& !is_iterable<std::decay_t<ValueT>>::value
+							&& is_tuple_like<std::decay_t<ValueT>>::value>
+						::type>
+	{
+		void operator () (SerializerT& s, ValueT&& value)
+		{
+			s.write_object_cb(std::forward<ValueT>(value),
+							  [&s](ValueT&& v){
+								  size_t i = 0;
+								  corecpp::tuple_foreach([&s, &i](auto&& v)
+								  {
+									  s.write_property(std::to_string(i), std::forward<decltype(v)>(v));
+									  i++;
+								  }, v);
+							  });
+
+		}
+	};
 
 	/*
 	template <typename SerializerT>
@@ -157,13 +180,13 @@ namespace corecpp
 	template <typename DeserializerT, typename ValueT>
 	struct deserialize_impl<DeserializerT, ValueT,
 		typename std::enable_if_t<corecpp::is_dereferencable_v<std::decay_t<ValueT>>
-			&& std::is_constructible_v<std::decay_t<ValueT>,
-				std::add_pointer_t<typename std::decay_t<ValueT>::element_type>>> >
+			&& std::is_constructible_v<std::decay_t<ValueT>, std::add_pointer_t<typename std::decay_t<ValueT>::element_type>>> >
 	{
 		void operator () (DeserializerT& d, ValueT& value)
 		{
 			value = ValueT {};
-			d.read_object_cb([&](const std::wstring& property){
+			d.template read_object_cb<ValueT>([&](const std::wstring& property)
+			{
 				using value_type = typename std::remove_reference<decltype(*value)>::type;
 				if (property != L"value")
 				{
@@ -183,7 +206,7 @@ namespace corecpp
 		void operator () (DeserializerT& d, ValueT& value)
 		{
 			value = ValueT {};
-			d.read_object_cb([&](const std::wstring& property){
+			d.template read_object_cb<ValueT>([&](const std::wstring& property){
 				using value_type = typename std::remove_reference<decltype(*value)>::type;
 				if (property != L"value")
 				{
@@ -251,6 +274,29 @@ namespace corecpp
 		void operator () (DeserializerT& d, ValueT& value)
 		{
 			d.read_array(value);
+		}
+	};
+	template <typename DeserializerT, typename ValueT>
+	struct deserialize_impl<DeserializerT, ValueT,
+							typename std::enable_if<
+								!is_deserializable<std::decay_t<ValueT>, std::decay_t<DeserializerT>>::value
+								&& !is_associative<std::decay_t<ValueT>>::value
+								&& !is_iterable<std::decay_t<ValueT>>::value
+								&& is_tuple_like<std::decay_t<ValueT>>::value>
+							::type>
+	{
+		void operator () (DeserializerT& d, ValueT& value)
+		{
+			d.template begin_object<ValueT>();
+			corecpp::tuple_foreach(
+				[&d](auto&& v)
+				{
+					d.read_property_cb([&v,&d] (const std::wstring &)
+					{
+						d.deserialize(v);
+					});
+				}, value);
+			d.end_object();
 		}
 	};
 

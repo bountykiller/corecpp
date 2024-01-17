@@ -150,6 +150,26 @@ class test_reflection final : public test_fixture
 		});
 	}
 
+	test_case_result test_is_tuple_like() const
+	{
+		struct test { bool actual; bool expected; };
+		test_cases<test> cases ({
+			{ corecpp::is_tuple_like<std::vector<int>>::value, false },
+			{ corecpp::is_tuple_like<std::string>::value, false },
+			{ corecpp::is_tuple_like<std::optional<int>>::value, false },
+			{ corecpp::is_tuple_like<std::unique_ptr<std::string>>::value, false },
+			{ corecpp::is_tuple_like<std::map<int, int>>::value, false },
+			{ corecpp::is_tuple_like<int*>::value, false },
+			{ corecpp::is_tuple_like<std::tuple<int, double, bool>>::value, true },
+			{ corecpp::is_tuple_like<std::pair<int*, std::string>>::value, true },
+			{ corecpp::is_tuple_like<std::array<int, 5>>::value, true },
+		});
+
+		return run(cases, [&](const test& t){
+			assert_equal(t.actual, t.expected);
+		});
+	}
+
 public:
 	tests_type tests() const override
 	{
@@ -160,7 +180,8 @@ public:
 			{ "test_is_time_point", [&] () { return test_is_time_point(); } },
 			{ "test_is_strong_enum", [&] () { return test_is_strong_enum(); } },
 			{ "test_alltype", [&] () { return test_alltype(); } },
-			{ "test_typelist", [&] () { return test_typelist(); } }
+			{ "test_typelist", [&] () { return test_typelist(); } },
+			{ "test_is_tuple_like", [&] () { return test_is_tuple_like(); } }
 		};
 	}
 

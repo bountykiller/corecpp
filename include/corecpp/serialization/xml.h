@@ -251,7 +251,7 @@ namespace corecpp::xml
 				m_indent_level++;
 			}
 			begin_object<ValueT>();
-			tuple_apply([&](const auto& prop) {
+			tuple_foreach([&](const auto& prop) {
 				if (m_pretty)
 				{
 					m_stream << "\n";

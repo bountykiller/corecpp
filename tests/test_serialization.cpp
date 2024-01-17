@@ -23,7 +23,8 @@
 using namespace corecpp;
 
 
-enum struct my_enum {
+enum struct my_enum
+{
 	first  = 1,
 	second = 2,
 	tierce = 4
@@ -34,7 +35,8 @@ std::ostream& operator << (std::ostream& oss, my_enum e)
 	return oss << static_cast<std::underlying_type_t<my_enum>>(e);
 }
 
-struct structured {
+struct structured
+{
 	int i;
 	bool b;
 	std::string s;
@@ -46,9 +48,9 @@ struct structured {
 	static const auto& properties()
 	{
 		static auto result = std::make_tuple(
-			corecpp::make_property("str", &structured::s),
+			corecpp::make_property("i", &structured::i),
 			corecpp::make_property("b", &structured::b),
-			corecpp::make_property("i", &structured::i)
+			corecpp::make_property("str", &structured::s)
 		);
 		return result;
 	}
@@ -60,7 +62,8 @@ std::ostream& operator << (std::ostream& oss, const structured& e)
 }
 
 
-struct complex {
+struct complex
+{
 	int real;
 	int imag;
 	bool operator == (const complex& other) const
@@ -75,14 +78,14 @@ struct complex {
 		s.write_property("imaginary_part", imag);
 	}
 	template <typename DeserializerT>
-	void deserialize(DeserializerT& d, const std::string& property)
+	void deserialize(DeserializerT& d, const std::wstring& property)
 	{
-		if (property == "real_part")
+		if (property == L"real_part")
 			d.deserialize(real);
-		else if (property == "imaginary_part")
+		else if (property == L"imaginary_part")
 			d.deserialize(imag);
 		else
-			throw std::runtime_error(corecpp::concat<std::string>({"invalid property ", property}));
+			throw std::runtime_error("invalid property");
 	}
 };
 
@@ -248,9 +251,20 @@ public:
 		test_cases<type_test<variant_type>> cases {
 			{ { }, "{\"-1\":null}" },
 			{ { 1 }, "{\"0\":1}" },
-			{ { -1.1 }, "{\"1\":-1.1}" },
+			{ { -1.1 }, "{\"1\":-1.100000}" },
 			{ std::string { "test" }, "{\"2\":\"test\"}" },
 			{ std::string { "" }, "{\"2\":\"\"}" },
+		};
+
+		return run_tests(cases);
+	}
+
+	test_case_result test_tuple() const
+	{
+		using tuple_type = std::tuple<int, double, std::string>;
+		test_cases<type_test<tuple_type>> cases {
+			{ { 0, 0, "" }, "{\"0\":0,\"1\":0.000000,\"2\":\"\"}" },
+			{ { 1, 1.0, "hello" }, "{\"0\":1,\"1\":1.000000,\"2\":\"hello\"}" },
 		};
 
 		return run_tests(cases);
@@ -269,6 +283,7 @@ public:
 			{ "complex_types", [&] () { return test_complex_types(); } },
 			{ "array_types", [&] () { return test_array_types(); } },
 			{ "variant", [&] () { return test_variant(); } },
+			{ "tuple", [&] () { return test_tuple(); } },
 		};
 	}
 };

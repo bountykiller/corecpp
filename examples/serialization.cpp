@@ -84,14 +84,14 @@ struct complex_type
 		s.write_property("value", value);
 	}
 	template <typename DeserializerT>
-	void deserialize(DeserializerT& d, const std::string& property)
+	void deserialize(DeserializerT& d, const std::wstring& property)
 	{
-		if (property == "value")
+		if (property == L"value")
 			d.deserialize(value);
-		else if (property == "name")
+		else if (property == L"name")
 			d.deserialize(symbol);
 		else
-			corecpp::throws<std::runtime_error>(corecpp::concat<std::string>({"invalid property ", property}));
+			corecpp::throws<std::runtime_error>("invalid property");
 	}
 };
 
@@ -121,6 +121,35 @@ void map_example(void)
 			std::cout << corecpp::etos(right, rights_strings) << " ";
 		std::cout << std::endl;
 	}
+}
+
+void tuple_example(void)
+{
+	static const std::tuple<int, std::vector<rights>> group_rights =
+		std::make_tuple(1, std::vector<rights> { rights::read, rights::write, rights::execute });
+	/*
+	,
+	{ 2, { rights::read, rights::write } },
+	{ 3, { rights::read } }
+	*/
+
+	std::ostringstream json;
+	corecpp::json::serializer s(json);
+	s.serialize(group_rights);
+	std::cout << json.str() << std::endl;
+
+	std::cout << "Now deserialize it!" << std::endl;
+	std::remove_const_t<decltype(group_rights)> group_rights_copy;
+	std::istringstream iss;
+	iss.str(json.str());
+	corecpp::json::deserializer d(iss);
+	d.deserialize(group_rights_copy);
+
+	std::cout << "Re-serialize in xml!" << std::endl;
+	std::ostringstream xml;
+	corecpp::xml::serializer x(xml);
+	x.serialize(group_rights_copy);
+	std::cout << xml.str() << std::endl;
 }
 
 int main(int argc, char** argv)
@@ -184,6 +213,9 @@ int main(int argc, char** argv)
 
 	std::cout << std::endl << std::endl << "STD::MAP example:" << std::endl;
 	map_example();
+
+	std::cout << std::endl << std::endl << "STD::TUPLE example:" << std::endl;
+	tuple_example();
 
 	return 0;
 };

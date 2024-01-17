@@ -450,7 +450,7 @@ public:
 			s.write_property("-1", nullptr);
 	}
 	template <typename DeserializerT>
-	void deserialize(DeserializerT& d, const std::string& property)
+	void deserialize(DeserializerT& d, const std::wstring& property)
 	{
 		reset();
 		m_type_index = std::stoi(property);
@@ -459,13 +459,13 @@ public:
 			visit([&d](auto&& value){
 				using ValueT = std::remove_reference_t<decltype(value)>;
 				new (&value) ValueT; /* default-initailize m_data to avoid having an incorrect variable */
-				d.read_element(value);
+				d.deserialize(value);
 			});
 		}
 		else
 		{
 			std::nullptr_t tmp;
-			d.read_element(tmp);
+			d.deserialize(tmp);
 		}
 	}
 };
