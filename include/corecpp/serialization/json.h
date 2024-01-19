@@ -364,6 +364,10 @@ namespace corecpp::json
 		{
 			m_stream << std::to_string(value);
 		}
+		void serialize(char value)
+		{
+			m_stream << std::to_string(value);
+		}
 		void serialize(char16_t value)
 		{
 			m_stream << std::to_string(value);
@@ -496,6 +500,23 @@ namespace corecpp::json
 
 		template <typename StringT, typename ValueT>
 		void write_property(const StringT& name, ValueT&& value)
+		{
+			if (!m_first)
+			{
+				m_stream << ',';
+				if (m_pretty)
+				{
+					m_stream << '\n';
+					indent();
+				}
+			}
+			serialize(name);
+			m_stream << ':';
+			serialize(std::forward<ValueT>(value));
+			m_first = false;
+		}
+		template <typename StringT, typename ValueT>
+		void write_property(const StringT& name, const ValueT& value)
 		{
 			if (!m_first)
 			{
@@ -676,7 +697,11 @@ namespace corecpp::json
 		{
 			deserialize_integral(value);
 		}
-		void deserialize(char16_t value)
+		void deserialize(char& value)
+		{
+			deserialize_integral(value);
+		}
+		void deserialize(char16_t& value)
 		{
 			deserialize_integral(value);
 		}

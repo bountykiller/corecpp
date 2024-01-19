@@ -261,13 +261,19 @@ public:
 
 	test_case_result test_tuple() const
 	{
+		using pair_type = std::tuple<bool, char>;
+		test_cases<type_test<pair_type>> pair_cases {
+			{ { false, 0 }, "{\"0\":false,\"1\":0}" },
+			{ { true, 'a' }, "{\"0\":true,\"1\":97}" }
+		};
+
 		using tuple_type = std::tuple<int, double, std::string>;
-		test_cases<type_test<tuple_type>> cases {
+		test_cases<type_test<tuple_type>> tuple_cases {
 			{ { 0, 0, "" }, "{\"0\":0,\"1\":0.000000,\"2\":\"\"}" },
 			{ { 1, 1.0, "hello" }, "{\"0\":1,\"1\":1.000000,\"2\":\"hello\"}" },
 		};
 
-		return run_tests(cases);
+		return run_tests(pair_cases) + run_tests(tuple_cases);
 	}
 
 public:

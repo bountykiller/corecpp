@@ -291,10 +291,11 @@ namespace corecpp
 			corecpp::tuple_foreach(
 				[&d](auto&& v)
 				{
-					d.read_property_cb([&v,&d] (const std::wstring &)
-					{
-						d.deserialize(v);
-					});
+					d.read_property_cb(
+						[&v,&d] (const std::wstring &)
+						{
+							d.deserialize(v);
+						});
 				}, value);
 			d.end_object();
 		}
