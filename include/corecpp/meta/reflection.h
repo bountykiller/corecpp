@@ -75,6 +75,15 @@ struct typelist<THead>
 	};
 
 	template<typename T>
+	struct contains
+	{
+		static constexpr bool value = std::is_same<T, head_type>::value;
+	};
+	template<typename T>
+	static inline constexpr auto contains_v = contains<T>::value;
+
+
+	template<typename T>
 	struct append
 	{
 		using type = typelist<T, head_type>;
@@ -92,6 +101,12 @@ struct typelist<THead>
 		using type = ApplyT<head_type>;
 	};
 
+	template<class FnT>
+	static void foreach(FnT fn)
+	{
+		fn.template operator()<head_type>();
+	}
+
 	static const std::type_info& type(size_t i)
 	{
 		static const std::type_info& result = typeid(head_type);
@@ -99,6 +114,8 @@ struct typelist<THead>
 			throw std::out_of_range(std::to_string(i));
 		return result;
 	}
+
+
 };
 
 template<typename THead, typename... TTail>
@@ -134,6 +151,15 @@ struct typelist : protected typelist<TTail...>
 	};
 
 	template<typename T>
+	struct contains
+	{
+		static constexpr bool value = std::is_same<T, head_type>::value
+		                              || tail_type::template contains<T>::value;
+	};
+	template<typename T>
+	static inline constexpr auto contains_v = contains<T>::value;
+
+	template<typename T>
 	struct append
 	{
 		using type = typelist<T, head_type, TTail...>;
@@ -147,13 +173,21 @@ struct typelist : protected typelist<TTail...>
 		using type = typename tail::template append<head>::type;
 	};
 
+	/*!
+	 * \brief Allows to transform typelist<a,b,c> into std::tuple<a,b,c> for example
+	 */
 	template<template <typename... T> class ApplyT>
 	struct apply //TODO: find a better name
 	{
 		using type = ApplyT<head_type, TTail...>;
 	};
 
-	//TODO: add the method to transform typelist<a,b,c> into std::tuple<a,b,c> for example
+	template<class FnT>
+	static void foreach(FnT fn)
+	{
+		fn.template operator()<head_type>();
+		tail_type::template foreach<FnT>(fn);
+	}
 
 	static const std::type_info& type(size_t i)
 	{
