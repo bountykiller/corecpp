@@ -15,6 +15,10 @@ namespace corecpp
 namespace diagnostic
 {
 
+/**
+ * @brief Constructs a formatter object with the specified format string.
+ * @param format The format string to be used for formatting events.
+ */
 formatter::formatter(const std::string& format)
 {
 	auto start = format.cbegin();
@@ -86,6 +90,11 @@ formatter::formatter(const std::string& format)
 	}
 }
 
+/**
+ * @brief Formats the given event according to the formatter's format string.
+ * @param ev The event to be formatted.
+ * @return The formatted string.
+ */
 std::string formatter::format(const event& ev) const
 {
 	std::string res;
@@ -94,6 +103,11 @@ std::string formatter::format(const event& ev) const
 	return res;
 }
 
+/**
+ * @brief Constructs a file_appender object with the specified filename and format string.
+ * @param filename The name of the file to append events to.
+ * @param format The format string to be used for formatting events.
+ */
 file_appender::file_appender(std::string filename, const std::string& format)
 : m_filename(filename), m_stream(filename, std::ios::out | std::ios::ate), m_formatter(format), m_file_size(0), m_max_file_size(0)
 {
@@ -105,6 +119,9 @@ file_appender::file_appender(std::string filename, const std::string& format)
 	m_file_size = m_stream.tellp(); // FIXME: approximation, could be inacurate
 }
 
+/**
+ * @brief Rolls the log file by renaming it with a timestamp and opens a new file.
+ */
 void file_appender::roll()
 {
 	std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -116,6 +133,10 @@ void file_appender::roll()
 	m_stream.open(m_filename, std::ios_base::out | std::ios_base::app);
 }
 
+/**
+ * @brief Appends the given event to the log file.
+ * @param ev The event to be appended.
+ */
 void file_appender::append(const event& ev)
 {
 	if (m_max_file_size && m_file_size > m_max_file_size)
@@ -125,12 +146,19 @@ void file_appender::append(const event& ev)
 	m_file_size += message.length() * sizeof(char);
 }
 
-
-
+/**
+ * @brief Constructs a periodic_file_appender object with the specified file template name, format string, and period.
+ * @param file_tmpl_name The template name of the file to append events to.
+ * @param format The format string to be used for formatting events.
+ * @param period The period after which the log file should be rolled.
+ */
 periodic_file_appender::periodic_file_appender(std::string& file_tmpl_name, const std::string& format, std::chrono::minutes period)
 : m_file_tmpl_name(file_tmpl_name), m_stream(), m_period(period), m_timestamp (), m_formatter(format)
 {}
 
+/**
+ * @brief Rolls the log file by renaming it with a timestamp and opens a new file.
+ */
 void periodic_file_appender::roll()
 {
 	std::ostringstream rolled_name;
@@ -140,6 +168,10 @@ void periodic_file_appender::roll()
 	m_stream.open(rolled_name.str(), std::ios_base::out | std::ios_base::app);
 }
 
+/**
+ * @brief Appends the given event to the log file.
+ * @param ev The event to be appended.
+ */
 void periodic_file_appender::append(const event& ev)
 {
 	if (m_timestamp < ev.timestamp)
@@ -153,8 +185,11 @@ void periodic_file_appender::append(const event& ev)
 	m_stream.write(message.c_str(), message.length());
 }
 
-
 /* TODO: bold & friends
+ */
+/**
+ * @brief Appends the given event to the console.
+ * @param ev The event to be appended.
  */
 void console_appender::append(const event& ev)
 {
@@ -188,7 +223,7 @@ void console_appender::append(const event& ev)
 	}
 }
 
-
 }
 
 }
+

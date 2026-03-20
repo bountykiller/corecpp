@@ -331,8 +331,16 @@ auto make_property(StringT&& name, ValueT&& value)
 	return property<ValueT>(std::forward<StringT>(name), std::forward<ValueT>(value));
 }
 
+/**
+ * \brief Converts an enum value to its underlying type.
+ *
+ * \tparam EnumT The enum type to convert.
+ * \param e The enum value to convert.
+ * \see https://en.cppreference.com/w/cpp/utility/to_underlying.html
+ * \return The underlying value of the enum.
+ */
 template <typename EnumT>
-auto underlying_value(EnumT e)
+auto to_underlying(EnumT e)
 {
 	return static_cast<std::underlying_type_t<EnumT>>(e);
 }
