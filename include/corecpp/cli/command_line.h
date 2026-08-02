@@ -38,7 +38,7 @@ namespace corecpp
 	};
 
 	/**
-	 * \brief interface used for reading command_line option
+	 * \brief interface used for reading command line option
 	 */
 	class option_reader
 	{
@@ -46,7 +46,7 @@ namespace corecpp
 		static corecpp::diagnostic::event_producer& logger();
 	public:
 		/**
-		 * \brief say if the reader accepts the value to be an empty string
+		 * \brief indicates if the reader accepts the value to be an empty string
 		 * \retval true if the reader expects the value to never be an empty string
 		 * \retval false if the reader accept the value to be an empty string
 		 */
@@ -60,8 +60,8 @@ namespace corecpp
 	};
 
 	/**
-	 * \brief class intented to read most of the possible option from the command line
-	 * require T to define the '>>' operator
+	 * \brief class intended to read most of the possible option from the command line
+	 * requires T to define the '>>' operator
 	 */
 	template <typename T, typename Enable = void>
 	class generic_option final : public option_reader
@@ -105,7 +105,7 @@ namespace corecpp
 	};
 
 	/**
-	 * \brief specialization for boolean. Will return true if the option is present without a value
+	 * \brief specialization for boolean. Returns true if the option is present without a value
 	 */
 	template <typename T>
 	class generic_option<T, std::enable_if_t<std::is_same_v<T, bool>>> final : public option_reader
@@ -149,7 +149,7 @@ namespace corecpp
 	};
 
 	/**
-	 *\brief parameters lies at the end of the command line
+	 * \brief parameters lies at the end of the command line
 	 */
 	class program_parameter
 	{
@@ -457,15 +457,33 @@ namespace corecpp
 			add_params(std::forward<Args>(values)...);
 		}
 
+		/**
+		 * \brief Displays the usage information for the command line interface.
+		 * This method prints the help message to the standard output, showing how to use the program and its options.
+		 */
 		void usage();
 
+		/**
+		 * \brief Parses the command line options.
+		 * This method processes the command line arguments and sets the corresponding options.
+		 *
+		 * \return An expected object containing the number of options parsed or an invalid_argument exception if parsing fails.
+		 */
 		expected<unsigned int, std::invalid_argument> parse_options(void);
 
-		/*!
-		 *\brief Will return the command given on the command line.
-		 *\return The command. If no command was specified, it returns an empty function.
+		/**
+		 * \brief Parses and returns the command to be executed based on the command line arguments.
+		 *
+		 * \return A function representing the command to be executed. If no command was specified, it returns an empty function.
 		 */
 		std::function<int()> parse_command(void);
+
+		/**
+		 * \brief Parses the command line parameters.
+		 * This method processes the command line parameters and sets the corresponding values.
+		 *
+		 * \return An expected object containing the number of parameters parsed or an invalid_argument exception if parsing fails.
+		 */
 		expected<unsigned int, std::invalid_argument> parse_parameters(void);
 	};
 
