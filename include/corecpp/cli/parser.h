@@ -311,6 +311,14 @@ namespace corecpp
 		static corecpp::diagnostic::event_producer& logger();
 		command_line& m_line;
 
+
+		template<typename DurationT>
+		void deserialize_duration(DurationT& value)
+		{
+			typename DurationT::rep time;
+			deserialize_integral(time);
+			value = DurationT { time };
+		}
 		template<typename IntegralT, typename = std::enable_if<std::is_integral<IntegralT>::value, IntegralT>>
 		void deserialize_integral(IntegralT& value)
 		{
@@ -393,6 +401,14 @@ namespace corecpp
 		void deserialize(double& value)
 		{
 			deserialize_float(value);
+		}
+		void deserialize(std::chrono::seconds& value)
+		{
+			deserialize_duration(value);
+		}
+		void deserialize(std::chrono::milliseconds& value)
+		{
+			deserialize_duration(value);
 		}
 		void deserialize(std::string& value)
 		{
@@ -514,6 +530,13 @@ namespace corecpp
 	{
 		command_line& m_line;
 
+		template<typename DurationT>
+		void deserialize_duration(DurationT& value)
+		{
+			typename DurationT::rep time;
+			deserialize_integral(time);
+			value = DurationT { time };
+		}
 		template<typename IntegralT, typename = std::enable_if<std::is_integral<IntegralT>::value, IntegralT>>
 		void deserialize_integral(IntegralT& value)
 		{
@@ -604,6 +627,14 @@ namespace corecpp
 		void deserialize(double& value)
 		{
 			deserialize_float(value);
+		}
+		void deserialize(std::chrono::seconds& value)
+		{
+			deserialize_duration(value);
+		}
+		void deserialize(std::chrono::milliseconds& value)
+		{
+			deserialize_duration(value);
 		}
 		void deserialize(std::string& value)
 		{
