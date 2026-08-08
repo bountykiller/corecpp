@@ -17,3 +17,8 @@ add_executable(serialize_bench serialize_bench.cpp)
 target_link_libraries (serialize_bench corecpp)
 target_include_directories(serialize_bench PRIVATE "${CMAKE_SOURCE_DIR}")
 target_include_directories(serialize_bench PRIVATE "${CMAKE_SOURCE_DIR}/include")
+
+add_executable(timer timer.cpp)
+target_link_libraries (timer corecpp)
+target_include_directories(timer PRIVATE "${CMAKE_SOURCE_DIR}")
+target_include_directories(timer PRIVATE "${CMAKE_SOURCE_DIR}/include")
