@@ -38,7 +38,7 @@ bool from_string(const std::string& str, diagnostic_level& type, std::locale l)
 }
 
 
-void channel::diagnose(event message, params& parameters)
+void channel::diagnose(record message, params& parameters)
 {
 	parameters.output.append(message);
 }
@@ -84,7 +84,6 @@ void channel::diagnose(diagnostic_level level, std::string message, std::string 
 	if(p->level < level) return;
 	diagnose({ level, std::move(message), {}, std::move(file), line, std::chrono::system_clock::now() }, *p);
 }
-
 
 
 channel& manager::_get_channel(const std::string& name)

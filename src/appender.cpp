@@ -34,9 +34,9 @@ formatter::formatter(const std::string& format)
 			case 't':
 			{
 				std::string str(start, pos - 1);
-				m_functions.emplace_back([str](std::string& msg, const event& ev) {
+				m_functions.emplace_back([str](std::string& msg, const record& entry) {
 					std::ostringstream oss;
-					std::time_t time = std::chrono::system_clock::to_time_t(ev.timestamp);
+					std::time_t time = std::chrono::system_clock::to_time_t(entry.timestamp);
 					oss << str << std::put_time(std::localtime(&time), "%F %T");
 					msg.append(oss.str());
 				});
@@ -46,35 +46,35 @@ formatter::formatter(const std::string& format)
 			case 'm':
 			{
 				std::string str(start, pos - 1);
-				m_functions.emplace_back([str](std::string& msg, const event& ev) { msg.append(str).append(ev.message); } );
+				m_functions.emplace_back([str](std::string& msg, const record& entry) { msg.append(str).append(entry.message); } );
 				start = ++pos;
 				break;
 			}
 			case 'l':
 			{
 				std::string str(start, pos - 1);
-				m_functions.emplace_back([str](std::string& msg, const event& ev) { msg.append(str).append(std::to_string(ev.line)); } );
+				m_functions.emplace_back([str](std::string& msg, const record& entry) { msg.append(str).append(std::to_string(entry.line)); } );
 				start = ++pos;
 				break;
 			}
 			case 'd':
 			{
 				std::string str(start, pos - 1);
-				m_functions.emplace_back([str](std::string& msg, const event& ev) { msg.append(str).append(ev.details); } );
+				m_functions.emplace_back([str](std::string& msg, const record& entry) { msg.append(str).append(entry.details); } );
 				start = ++pos;
 				break;
 			}
 			case 'f':
 			{
 				std::string str(start, pos - 1);
-				m_functions.emplace_back([str](std::string& msg, const event& ev) { msg.append(str).append(ev.file); } );
+				m_functions.emplace_back([str](std::string& msg, const record& entry) { msg.append(str).append(entry.file); } );
 				start = ++pos;
 				break;
 			}
 			case 'g':
 			{
 				std::string str(start, pos - 1);
-				m_functions.emplace_back([str](std::string& msg, const event& ev) { msg.append(str).append(to_string(ev.level)); } );
+				m_functions.emplace_back([str](std::string& msg, const record& entry) { msg.append(str).append(to_string(entry.level)); } );
 				start = ++pos;
 				break;
 			}
@@ -86,20 +86,20 @@ formatter::formatter(const std::string& format)
 	if (start != format.cend())
 	{
 		std::string str(start, pos);
-		m_functions.emplace_back([str](std::string& msg, const event& ev) { msg.append(str); } );
+		m_functions.emplace_back([str](std::string& msg, const record& entry) { msg.append(str); } );
 	}
 }
 
 /**
  * @brief Formats the given event according to the formatter's format string.
- * @param ev The event to be formatted.
+ * @param entry The event to be formatted.
  * @return The formatted string.
  */
-std::string formatter::format(const event& ev) const
+std::string formatter::format(const record& entry) const
 {
 	std::string res;
 	for(const auto& fn : m_functions)
-		fn(res, ev);
+		fn(res, entry);
 	return res;
 }
 
@@ -135,13 +135,13 @@ void file_appender::roll()
 
 /**
  * @brief Appends the given event to the log file.
- * @param ev The event to be appended.
+ * @param entry The event to be appended.
  */
-void file_appender::append(const event& ev)
+void file_appender::append(const record& entry)
 {
 	if (m_max_file_size && m_file_size > m_max_file_size)
 		roll();
-	std::string message = m_formatter.format(ev);
+	std::string message = m_formatter.format(entry);
 	m_stream.write(message.c_str(), message.length());
 	m_file_size += message.length() * sizeof(char);
 }
@@ -170,18 +170,18 @@ void periodic_file_appender::roll()
 
 /**
  * @brief Appends the given event to the log file.
- * @param ev The event to be appended.
+ * @param entry The event to be appended.
  */
-void periodic_file_appender::append(const event& ev)
+void periodic_file_appender::append(const record& entry)
 {
-	if (m_timestamp < ev.timestamp)
+	if (m_timestamp < entry.timestamp)
 	{
 		roll();
-		long factor = (long)std::ceil((ev.timestamp - m_timestamp) / m_period);
+		long factor = (long)std::ceil((entry.timestamp - m_timestamp) / m_period);
 		m_timestamp += m_period * factor;
 	}
-	assert (m_timestamp >= ev.timestamp);
-	std::string message = m_formatter.format(ev);
+	assert (m_timestamp >= entry.timestamp);
+	std::string message = m_formatter.format(entry);
 	m_stream.write(message.c_str(), message.length());
 }
 
@@ -189,12 +189,12 @@ void periodic_file_appender::append(const event& ev)
  */
 /**
  * @brief Appends the given event to the console.
- * @param ev The event to be appended.
+ * @param entry The event to be appended.
  */
-void console_appender::append(const event& ev)
+void console_appender::append(const record& entry)
 {
-	std::string message = m_formatter.format(ev);
-	switch (ev.level)
+	std::string message = m_formatter.format(entry);
+	switch (entry.level)
 	{
 		case diagnostic_level::fatal:
 			std::cerr << corecpp::graphic_rendition<sgr_p::fg_red>::value << message << corecpp::graphic_rendition<sgr_p::all_off>::value << std::endl;

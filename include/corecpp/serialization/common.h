@@ -9,6 +9,7 @@
 #include <codecvt>
 
 #include <corecpp/meta/extensions.h>
+#include <corecpp/algorithm.h>
 
 namespace corecpp
 {
@@ -230,9 +231,9 @@ namespace corecpp
 	};
 	template <typename DeserializerT, typename ValueT>
 	struct deserialize_impl<DeserializerT, ValueT,
-						typename std::enable_if<
-							corecpp::is_time_point<std::decay_t<ValueT>>::value>
-							::type>
+				typename std::enable_if<
+					corecpp::is_time_point<std::decay_t<ValueT>>::value>
+					::type>
 	{
 		void operator () (DeserializerT& d, ValueT& value)
 		{
@@ -240,6 +241,16 @@ namespace corecpp
 			d.deserialize(ticks);
 			value -= value.time_since_epoch(); //reset the value to 0
 			value += typename ValueT::duration { ticks };
+		}
+	};
+	template <typename DeserializerT, typename Rep, typename Period>
+	struct deserialize_impl<DeserializerT, std::chrono::duration<Rep, Period>>
+	{
+		void operator () (DeserializerT& d, std::chrono::duration<Rep, Period>& value)
+		{
+			Rep ticks;
+			d.deserialize(ticks);
+			value = std::chrono::duration<Rep, Period>(ticks);
 		}
 	};
 	template <typename DeserializerT, typename ValueT>

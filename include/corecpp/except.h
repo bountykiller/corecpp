@@ -143,10 +143,26 @@ namespace corecpp
 		{ };
 	};
 
+	struct unexpected_error : public error<std::logic_error>
+	{
+		template<typename... ArgsT>
+		unexpected_error(ArgsT&&... args)
+		: error<std::logic_error> { std::forward<ArgsT>(args)... }
+		{ };
+	};
+
+
 	template<typename ExceptionT, typename... ArgsT>
 	[[ noreturn ]] void throws (ArgsT&&... args)
 	{
 		throw ExceptionT { std::forward<ArgsT>(args)... };
+	}
+
+	[[ noreturn ]] void throw_system_error(int err, const std::error_category& cat);
+
+	[[ noreturn ]] static inline void unreachable()
+	{
+		corecpp::throws<std::logic_error>("unreachable");
 	}
 }
 

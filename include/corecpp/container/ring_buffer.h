@@ -58,10 +58,10 @@ namespace corecpp
 		ring_buffer(std::size_t capacity, allocator_type&& allocator)
 		: m_buffer(0), m_capacity(0), m_first(0), m_count(0), m_allocator(allocator)
 		{
-			m_buffer = allocator.allocate(m_capacity, &this[1]);
+			m_buffer = m_allocator.allocate(m_capacity, &this[1]);
 		}
 		ring_buffer(const ring_buffer& other)
-		: m_buffer(nullptr), m_capacity(other.m_capacity), m_first(other.m_first), m_count(other.m_count), m_allocator(other.allocator)
+		: m_buffer(nullptr), m_capacity(other.m_capacity), m_first(other.m_first), m_count(other.m_count), m_allocator(other.m_allocator)
 		{
 			m_buffer = m_allocator.allocate(m_capacity, &this[1]);
 			//TODO: copy elements

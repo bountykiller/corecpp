@@ -24,10 +24,7 @@
 #include <corecpp/container/waiting_queue.h>
 #include <corecpp/algorithm.h>
 
-namespace corecpp
-{
-
-namespace diagnostic
+namespace corecpp::diagnostic
 {
 
 enum struct diagnostic_level : short
@@ -46,7 +43,7 @@ const std::string& to_string(diagnostic_level type);
 bool from_string(const std::string& str, diagnostic_level& type, std::locale l);
 
 
-struct event
+struct record
 {
 	diagnostic_level level;
 	std::string message;
@@ -56,27 +53,28 @@ struct event
 	std::chrono::system_clock::time_point timestamp;
 };
 
-inline std::ostream& operator << (std::ostream& os, const event& e)
+//TODO: use std::format if available
+inline std::ostream& operator << (std::ostream& os, const record& entry)
 {
 	//std::time_t timestamp = std::chrono::system_clock::to_time_t(e.timestamp);
 	//return os << std::put_time(std::localtime(&timestamp), "%F %T") << ":" << to_string(e.level) << " at " << e.file << ":" << e.line << "\t" << e.message << "\t" << e.details;
-	return os << to_string(e.level) << " at " << e.file << ":" << e.line << "\t" << e.message << "\t" << e.details;
+	return os << to_string(entry.level) << " at " << entry.file << ":" << entry.line << "\t" << entry.message << "\t" << entry.details;
 }
 
 
 struct appender
 {
-	virtual void append(const event& ev) = 0;
+	virtual void append(const record& entry) = 0;
 };
 
 
 struct formatter
 {
-	using format_fn_type = std::function<void(std::string& str, const event& ev)>;
+	using format_fn_type = std::function<void(std::string& str, const record& entry)>;
 	std::vector<format_fn_type> m_functions;
 public:
 	formatter(const std::string& format);
-	std::string format(const event& ev) const;
+	std::string format(const record& entry) const;
 };
 
 
@@ -106,9 +104,8 @@ public:
 	{
 		return m_max_file_size;
 	}
-	void append(const event& ev) override;
+	void append(const record& entry) override;
 };
-
 
 
 class periodic_file_appender : public appender
@@ -122,9 +119,8 @@ class periodic_file_appender : public appender
 	void roll();
 public:
 	periodic_file_appender(std::string& file_tmpl_name, const std::string& format, std::chrono::minutes period);
-	void append(const event& ev) override;
+	void append(const record& entry) override;
 };
-
 
 
 class console_appender : public appender
@@ -136,23 +132,23 @@ public:
 	{}
 	~console_appender()
 	{}
-	void append(const event& ev) override;
+	void append(const record& entry) override;
 };
 
 
 template <typename AppenderT>
 class async_appender : public appender
 {
-	corecpp::waiting_queue<std::unique_ptr<event>> m_queue;
+	corecpp::waiting_queue<std::unique_ptr<record>> m_queue;
 	AppenderT m_appender;
 	std::thread m_thread;
 
 	void run()
 	{
-		std::unique_ptr<event> ev;
-		for (m_queue.pop(ev); ev; m_queue.pop(ev))
+		std::unique_ptr<record> entry;
+		for (m_queue.pop(entry); entry; m_queue.pop(entry))
 		{
-			m_appender.append(ev);
+			m_appender.append(entry);
 		}
 	}
 public:
@@ -166,9 +162,9 @@ public:
 		m_queue.emplace(nullptr);
 		m_thread.join();
 	}
-	void append(const event& ev) override
+	void append(const record& entry) override
 	{
-		m_queue.emplace(std::make_unique<event>(ev));
+		m_queue.emplace(std::make_unique<record>(entry));
 	}
 };
 
@@ -183,7 +179,7 @@ class channel final
 	};
 	std::shared_ptr<params> m_params; //using a shared_ptr in order to minimize the amount of time during which the channel is locked when logging
 	mutable std::mutex m_mutex;
-	static void diagnose(event message, params& parameters);
+	static void diagnose(record message, params& parameters);
 	channel() = default;
 	channel(const channel&) = delete;
 	channel& operator=(const channel&) = delete;
@@ -220,8 +216,8 @@ public:
 	void diagnose(diagnostic_level level, std::string message, std::string file, uint line);
 	void diagnose(diagnostic_level level, std::string message, std::string details, std::string file, uint line);
 	void diagnose(diagnostic_level level, std::string message, std::function<std::string()> details, std::string file, uint line);
+	// TODO Use const std::source_location location = std::source_location::current()
 };
-
 
 
 class manager
@@ -380,8 +376,6 @@ inline void swap(channel& a, channel& b)
 	a.swap(b);
 };
 
-
-}
 
 }
 

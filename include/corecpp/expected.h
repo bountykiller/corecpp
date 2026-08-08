@@ -1,6 +1,7 @@
 #ifndef CORECPP_EXPECTED_H
 #define CORECPP_EXPECTED_H
 
+#include <format>
 #include <utility>
 
 #include <corecpp/variant.h>
@@ -62,6 +63,62 @@ namespace corecpp
 		return e.apply([&os](auto x) { return os << x; });
 	}
 
+	/**
+	 * Make the program crash if an error is detected
+	 *
+	 * \details if an error is detected, this method will throw an exception.
+	 * Since she'd marked as noexcept, this will result in std::terminate being called
+	 */
+	static inline void ensure(bool condition) noexcept
+	{
+		if ( condition ) [[likely]]
+			return;
+
+		throws<unexpected_error>("The unexpected happenend: false != true !!!");
+	}
+
+	/**
+	 * Make the program crash if an error is detected
+	 *
+	 * \details if an error is detected, this method will throw an exception.
+	 * Since she'd marked as noexcept, this will result in std::terminate being called
+	 */
+	static inline void ensure(bool condition, const char *what) noexcept
+	{
+		if ( condition ) [[likely]]
+			return;
+
+		throws<unexpected_error>(what);
+	}
+
+	/**
+	 * Make the program crash if an error is detected
+	 *
+	 * \details if an error is detected, this method will throw an exception.
+	 * Since she'd marked as noexcept, this will result in std::terminate being called
+	 */
+	template<typename TValue>
+	static inline void ensure(const TValue& expected, const TValue &actual)  noexcept
+	{
+		if ( expected == actual ) [[likely]]
+			return;
+
+		throws<unexpected_error>(std::format("The unexpected happenend: got {} instead of {} !!!", expected, actual));
+	}
+
+	/**
+	 * Make the program crash if an error is detected
+	 *
+	 * \details if an error is detected, this method will throw an exception.
+	 * Since she'd marked as noexcept, this will result in std::terminate being called
+	 */
+	static inline void unsupported(bool condition) noexcept
+	{
+		if ( !condition ) [[likely]]
+			return;
+
+		throws<unimplemented>(std::format("Unsupported case happened"));
+	}
 }
 
 #endif

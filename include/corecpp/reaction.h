@@ -10,10 +10,10 @@
 namespace corecpp
 {
 	template<class>
-	struct event;
+	struct reaction;
 
 	template<class ResultT, class... ArgsT>
-	struct event<ResultT(ArgsT...)>
+	struct reaction<ResultT(ArgsT...)>
 	{
 		using func_type = std::function<ResultT(ArgsT...)>;
 		using result_type = typename func_type::result_type;

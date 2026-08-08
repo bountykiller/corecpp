@@ -12,13 +12,13 @@
 namespace corecpp::json
 {
 
-corecpp::diagnostic::channel& json_channel()
+static corecpp::diagnostic::channel& json_channel()
 {
 	static auto& channel = corecpp::diagnostic::manager::get_channel("corecpp::json");
 	return channel;
 }
 
-corecpp::diagnostic::event_producer& json_logger()
+_internal corecpp::diagnostic::event_producer& json_logger()
 {
 	static auto logger = corecpp::diagnostic::event_producer(json_channel());
 	return logger;
@@ -55,7 +55,7 @@ std::string to_string(const token& tk)
 		case token::index_of<false_token>::value:
 			return "false";
 	}
-	corecpp::throws<std::logic_error>("unreachable");
+	unreachable();
 }
 
 wchar_t tokenizer::read_escaped_char()
@@ -485,9 +485,9 @@ shift_result object_rule::shift(token&& tk)
 			{
 				case token::index_of<open_brace_token>::value:
 					m_status = status::members;
-					return { true, rule { pair_rule {} } };
+					return shift_result { true, rule { pair_rule {} } };
 				default:
-					return { false, nullptr };
+					return shift_result { false, nullptr };
 			}
 		}
 		case status::members:
@@ -495,26 +495,26 @@ shift_result object_rule::shift(token&& tk)
 			switch (tk.index())
 			{
 				case token::index_of<colon_token>::value:
-					return { true, rule { pair_rule {} } };
+					return shift_result { true, rule { pair_rule {} } };
 				case token::index_of<close_brace_token>::value:
 					m_status = status::end;
-					return { true, nullptr };
+					return shift_result { true, nullptr };
 				default:
-					return { false, nullptr };
+					return shift_result { false, nullptr };
 			}
 		}
 		case status::end:
 		default:
-			return { false, nullptr };
+			return shift_result { false, nullptr };
 	}
 }
 
 shift_result object_rule::shift(node&& n)
 {
 	if (m_status != status::members)
-		return { false, nullptr };
+		return shift_result { false, nullptr };
 	if(n.index() != node::index_of<pair_node>::value)
-		return { false, nullptr };
+		return shift_result { false, nullptr };
 	m_members.emplace_back(std::move(n.get<pair_node>()));
 	return { true, nullptr };
 }
@@ -537,9 +537,9 @@ shift_result array_rule::shift(token&& tk)
 			{
 				case token::index_of<open_bracket_token>::value:
 					m_status = status::members;
-					return { true, rule { value_rule {} } };
+					return shift_result { true, rule { value_rule {} } };
 				default:
-					return { false, nullptr };
+					return shift_result { false, nullptr };
 			}
 		}
 		case status::members:
@@ -547,24 +547,24 @@ shift_result array_rule::shift(token&& tk)
 			switch (tk.index())
 			{
 				case token::index_of<colon_token>::value:
-					return { true, rule { value_rule {} } };
+					return shift_result { true, rule { value_rule {} } };
 				case token::index_of<close_bracket_token>::value:
 					m_status = status::end;
 					return { true, nullptr };
 				default:
-					return { false, nullptr };
+					return shift_result { false, nullptr };
 			}
 		}
 		case status::end:
 		default:
-			return { false, nullptr };
+			return shift_result { false, nullptr };
 	}
 }
 
 shift_result array_rule::shift(node&& n)
 {
 	if (m_status != status::members)
-		return { false, nullptr };
+		return shift_result { false, nullptr };
 	switch(n.index())
 	{
 		case node::index_of<object_node>::value:
@@ -592,7 +592,7 @@ shift_result array_rule::shift(node&& n)
 			m_values.emplace_back(std::move(n.get<null_node>()));
 			return { true, nullptr };
 		default:
-			return { false, nullptr };
+			return shift_result { false, nullptr };
 	}
 }
 
@@ -610,26 +610,26 @@ shift_result pair_rule::shift(token&& tk)
 	{
 		case status::start:
 			if(tk.index() != token::index_of<string_token>::value)
-				return { false, nullptr };
+				return shift_result { false, nullptr };
 			m_status = status::name;
 			m_name = tk.get<string_token>().value;
 			return { true, nullptr };
 		case status::name:
 			if(tk.index() != token::index_of<colon_token>::value)
-				return { false, nullptr };
+				return shift_result { false, nullptr };
 			m_status = status::colon;
-			return { true, rule { value_rule {} } };
+			return shift_result { true, rule { value_rule {} } };
 		case status::colon:
 		case status::value:
 		default:
-			return { false, nullptr };
+			return shift_result { false, nullptr };
 	}
 }
 
 shift_result pair_rule::shift(node&& n)
 {
 	if (m_status != status::colon)
-		return { false, nullptr };
+		return shift_result { false, nullptr };
 	switch(n.index())
 	{
 		case node::index_of<object_node>::value:
@@ -716,14 +716,14 @@ shift_result value_rule::shift(token&& tk)
 		case token::index_of<dot_token>::value:
 		case token::index_of<colon_token>::value:
 		default:
-			return { false, nullptr };
+			return shift_result { false, nullptr };
 	}
 }
 
 shift_result value_rule::shift(node&& n)
 {
 	if (m_value.index() != corecpp::variant<std::nullptr_t, value_node>::index_of<std::nullptr_t>::value)
- 		return { false, nullptr };
+ 		return shift_result { false, nullptr };
 	switch(n.index())
 	{
 		case node::index_of<object_node>::value:
@@ -733,7 +733,7 @@ shift_result value_rule::shift(node&& n)
 			m_value = value_node { std::move(n.get<array_node>()) };
 			return { true, nullptr };
 		default:
-			return { false, nullptr };
+			return shift_result { false, nullptr };
 	}
 }
 

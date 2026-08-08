@@ -295,6 +295,11 @@ namespace corecpp::json
 	{
 		bool eaten;
 		corecpp::variant<std::nullptr_t, rule> next_rule = nullptr;
+		shift_result(bool tk_eaten, corecpp::variant<std::nullptr_t, rule>&& tk_next_rule)
+		: eaten(tk_eaten), next_rule(std::move(tk_next_rule))
+		{
+		}
+
 		shift_result(const shift_result&) = delete;
 		shift_result(shift_result&&) = default;
 		shift_result& operator = (const shift_result&) = delete;
