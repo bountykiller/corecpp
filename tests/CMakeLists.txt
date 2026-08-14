@@ -14,8 +14,12 @@ target_link_libraries (test_algorithms corecpp)
 add_executable(test_flags test_flags.cpp)
 target_link_libraries (test_flags corecpp)
 
+add_executable(test_socket test_socket.cpp)
+target_link_libraries (test_socket corecpp)
+
 add_test(NAME "test_serialization" COMMAND test_serialization)
 add_test(NAME "test_command"       COMMAND test_command)
 add_test(NAME "test_reflection"    COMMAND test_reflection)
 add_test(NAME "test_algorithms"    COMMAND test_algorithms)
 add_test(NAME "test_flags"         COMMAND test_flags)
+add_test(NAME "test_socket"        COMMAND test_socket)

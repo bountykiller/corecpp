@@ -43,6 +43,13 @@ protected:
 		return *this;
 	}
 
+	template <typename... TArgs>
+	int fcntl(int cmd, TArgs... args)
+	{
+		return ::fcntl(m_fd, cmd, args...);
+	}
+
+
 protected:
 	int m_fd;
 };

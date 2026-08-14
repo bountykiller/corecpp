@@ -1,6 +1,8 @@
 #ifndef CORE_CPP_EVENT_H
 #define CORE_CPP_EVENT_H
 
+#include <cassert>
+
 #include <chrono>
 #include <functional>
 #include <map>
@@ -12,12 +14,13 @@
 #include <sys/timerfd.h>
 #include <sys/signalfd.h>
 #include <signal.h>
+#include <fcntl.h>
 #include <pthread.h>
 
 #include <corecpp/file.h>
 #include <corecpp/except.h>
 #include <corecpp/expected.h>
-#include <cassert>
+#include <corecpp/io/socket.h>
 
 namespace corecpp
 {
@@ -49,7 +52,7 @@ class ioloop final : public filedesc
 		* @return The result of the event loop execution.
 		*/
 		int run();
-		void add(int fd, event& e);
+		void add(int fd, event& e, uint32_t events = EPOLLIN);
 		void remove(int fd);
 
 	private:
@@ -62,11 +65,11 @@ class ioloop final : public filedesc
 class event
 {
 public:
-	using action = std::function<void(event&)>;
+	using action = std::function<void(event&, uint32_t)>;
 
-	void act(uintptr_t)
+	void act(uint32_t events)
 	{
-		m_action(*this);
+		m_action(*this, events);
 		if ( m_once )
 			unsubscribe();
 	}
@@ -79,7 +82,7 @@ protected:
 	m_once { false }
 	{}
 
-	void subscribe(int ident, bool once)
+	void subscribe(int ident, bool once, uint32_t events)
 	{
 		if ( m_ident != -1 )
 		{
@@ -88,7 +91,7 @@ protected:
 		}
 
 		/* TODO: Add once flag in m_loop */
-		m_loop.add(ident, *this);
+		m_loop.add(ident, *this, events);
 		m_ident = ident;
 		m_once = once;
 	}
@@ -195,13 +198,13 @@ public:
 
 	void expires_in(std::chrono::seconds timeout)
 	{
-		event::subscribe(m_timer.get(), true);
+		event::subscribe(m_timer.get(), true, EPOLLIN);
 		m_timer.expires_in(timeout);
 	}
 
 	void expires_each(std::chrono::seconds timeout)
 	{
-		event::subscribe(m_timer.get(), false);
+		event::subscribe(m_timer.get(), false, EPOLLIN);
 		m_timer.expires_each(timeout);
 	}
 
@@ -211,7 +214,7 @@ public:
 	}
 
 private:
-	static void on_action(event& ev)
+	static void on_action(event& ev, uint32_t)
 	{
 		// Here the tricks is that we will be called with the reference to the event as the 1st parameter
 		// Since we inherit from event, this reference is also a reference to ourselves, so we can cast it here
@@ -274,7 +277,7 @@ class signal_event : public event
 			if ( pthread_sigmask(SIG_BLOCK, &set, nullptr) != 0 ) [[unlikely]]
 				corecpp::throws<std::system_error>(errno, std::system_category());
 			m_signal.wait_for(set); //should be done 1st to ensure we have a valid file descriptor
-			event::subscribe(m_signal.get(), false);
+			event::subscribe(m_signal.get(), false, EPOLLIN);
 		}
 
 		~signal_event()
@@ -283,7 +286,7 @@ class signal_event : public event
 		}
 
 	private:
-		static void on_action(event& ev)
+		static void on_action(event& ev, uint32_t)
 		{
 			// we are called with a reference to ourselves, since we inherit
 			// from event, so we can cast it back
@@ -301,6 +304,203 @@ class signal_event : public event
 
 		signal_fd m_signal;
 		signal_action m_action;
+};
+
+/**
+ * \brief Represents an asynchronous stream socket driven by an ioloop.
+ *
+ * The async_streamsocket class is used to manage stream socket events within
+ * an ioloop. It allows scheduling of connect, read and write events and
+ * provides automatic cancellation when the async_streamsocket object is
+ * destroyed.
+ */
+template <typename DomainT>
+class async_streamsocket : public streamsocket<DomainT>, public event
+{
+	public:
+		using read_action = std::function<void(ssize_t)>;
+		using write_action = std::function<void(ssize_t)>;
+		using connect_action = std::function<void(int)>;
+
+		async_streamsocket(ioloop& loop, int protocol)
+		: streamsocket<DomainT> { protocol },
+		  event { loop, on_action },
+		  m_read_buffer { },
+		  m_write_buffer { },
+		  m_read_action { },
+		  m_write_action { },
+		  m_connect_action { }
+		{
+		}
+
+		/**
+		* Asynchronously connect the socket to the given address.
+		*
+		* The socket is put in non-blocking mode and subscribed to the ioloop
+		* until the connection is established.
+		*
+		* @param dest The address to connect to.
+		* @param action The callback invoked once the connection is settled,
+		*        with 0 on success or the errno value on failure.
+		*/
+		void async_connect(const DomainT::address_type &dest, connect_action &&action)
+		{
+			m_connect_action = std::move(action);
+
+			int flags = fcntl(F_GETFL, 0);
+			if ( flags != -1 ) [[likely]]
+				fcntl(F_SETFL, flags | O_NONBLOCK);
+
+			int res = connect(dest);
+			if ( res == 0 ) [[likely]]
+			{
+				m_connect_action(0); //Put it in the ioloop?
+				return;
+			}
+			if ( errno != EINPROGRESS && errno != EINTR && errno != EAGAIN ) [[unlikely]]
+			{
+				m_connect_action(errno); //Put it in the ioloop?
+				return;
+			}
+
+			/* the connection is being established, wait for the socket to become writable */
+			event::subscribe(streamsocket<DomainT>::m_fd, true, EPOLLOUT);
+		}
+
+		/**
+		* Asynchronously read data from the socket into the given buffer.
+		*
+		* @param buffer The buffer that will receive the data.
+		* @param action The callback invoked once data has been read, with the
+		*        number of bytes read (or -1 on error).
+		*/
+		void async_recv(std::span<std::byte> buffer, read_action &&action)
+		{
+			m_read_buffer = buffer;
+			m_read_action = std::move(action);
+			event::subscribe(streamsocket<DomainT>::m_fd, false, EPOLLIN);
+		}
+
+		/**
+		* Asynchronously send data from the given buffer through the socket.
+		*
+		* @param buffer The buffer containing the data to send.
+		* @param action The callback invoked once data has been sent, with the
+		*        number of bytes sent (or -1 on error).
+		*/
+		void async_send(std::span<const std::byte> buffer, write_action &&action)
+		{
+			m_write_buffer = buffer;
+			m_write_action = std::move(action);
+			event::subscribe(streamsocket<DomainT>::m_fd, false, EPOLLOUT);
+		}
+
+		~async_streamsocket()
+		{
+			unsubscribe();
+		}
+
+	private:
+
+		static void on_action(event& ev, uint32_t events)
+		{
+			// we are called with a reference to ourselves, since we inherit
+			// from event, so we can cast it back
+			async_streamsocket& socket = static_cast<async_streamsocket&>(ev);
+			if ( events & EPOLLIN )
+				socket.on_read();
+			if ( events & EPOLLOUT )
+			{
+				if ( socket.m_connect_action )
+				{
+					socket.on_connect();
+					socket.m_connect_action = nullptr;
+				}
+				else
+					socket.on_write();
+			}
+		}
+
+		void on_connect()
+		{
+			int err = 0;
+			socklen_t len = sizeof(err);
+			getsockopt(this->get(), SOL_SOCKET, SO_ERROR, &err, &len);
+			m_connect_action(err);
+		}
+
+		void on_read()
+		{
+			m_read_action(this->recv(m_read_buffer, msgflags::none));
+		}
+
+		void on_write()
+		{
+			m_write_action(this->send(m_write_buffer, msgflags::none));
+		}
+
+		std::span<std::byte> m_read_buffer;
+		std::span<const std::byte> m_write_buffer;
+		read_action m_read_action;
+		write_action m_write_action;
+		connect_action m_connect_action;
+};
+
+/**
+ * \brief Represents an asynchronous stream socket acceptor driven by an ioloop.
+ *
+ * The async_socket_acceptor class is used to accept stream connections within
+ * an ioloop. It schedules an accept event and invokes the provided callback
+ * each time a new connection is received.
+ */
+template <typename DomainT>
+class async_socket_acceptor : public socket_acceptor<DomainT>, public event
+{
+	public:
+		using accept_action = std::function<void(streamsocket<DomainT>)>;
+
+		async_socket_acceptor(ioloop& loop, int protocol)
+		: socket_acceptor<DomainT> { protocol },
+		  event { loop, on_action },
+		  m_accept_action { }
+		{
+		}
+
+		/**
+		* Asynchronously accept new connections.
+		*
+		* The acceptor is subscribed to the ioloop and the given callback is
+		* invoked each time a new connection is received.
+		*
+		* @param action The callback invoked for each accepted connection.
+		*/
+		void async_accept(accept_action &&action)
+		{
+			m_accept_action = std::move(action);
+			event::subscribe(socket_acceptor<DomainT>::m_fd, false, EPOLLIN);
+		}
+
+		~async_socket_acceptor()
+		{
+			unsubscribe();
+		}
+
+	private:
+
+		static void on_action(event& ev, uint32_t)
+		{
+			// we are called with a reference to ourselves, since we inherit
+			// from event, so we can cast it back
+			async_socket_acceptor& acceptor = static_cast<async_socket_acceptor&>(ev);
+			acceptor.on_accept();
+		}
+
+		void on_accept()
+		{
+			m_accept_action(socket_acceptor<DomainT>::accept());
+		}
+
+		accept_action m_accept_action;
 };
 
 }

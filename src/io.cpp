@@ -50,14 +50,14 @@ int ioloop::run()
 	return 0;
 }
 
-void ioloop::add(int fd, event& e)
+void ioloop::add(int fd, event& e, uint32_t events)
 {
 	io_logger().info("Add fd", std::to_string(fd), __FILE__, __LINE__);
 
 	auto [it, inserted] = m_events.emplace(fd, &e);
 	ensure(inserted, "fd already registered");
 
-	epoll_event event { .events = EPOLLIN, .data = { .fd = fd } };
+	epoll_event event { .events = events, .data = { .fd = fd } };
 	if ( epoll_ctl(m_fd, EPOLL_CTL_ADD, fd, &event) != 0 ) [[unlikely]]
 	{
 		m_events.erase(fd);
