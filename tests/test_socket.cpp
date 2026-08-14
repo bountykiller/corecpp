@@ -17,6 +17,10 @@ namespace
 constexpr size_t packet_size = 8192;
 constexpr const char* socket_path = "/tmp/corecpp_test_socket.sock";
 
+constexpr size_t datagram_size = 1024;
+constexpr const char* server_dgram_path = "/tmp/corecpp_test_dgram_server.sock";
+constexpr const char* client_dgram_path = "/tmp/corecpp_test_dgram_client.sock";
+
 ssize_t send_all(streamsocket<family::local>& sock, const std::span<const std::byte> buffer)
 {
 	size_t total = 0;
@@ -127,11 +131,92 @@ class test_socket : public test_fixture
 		return {};
 	}
 
+	test_case_result test_echo_datagram() const
+	{
+		::unlink(server_dgram_path);
+		::unlink(client_dgram_path);
+
+		std::vector<std::byte> sent(datagram_size);
+		for (size_t i = 0; i < sent.size(); ++i)
+			sent[i] = static_cast<std::byte>(i * 97 + 5);
+
+		std::atomic<bool> server_ready { false };
+		std::string server_error;
+		bool server_ok = false;
+
+		std::thread server { [&] {
+			try
+			{
+				ioloop loop;
+				async_datagramsocket<family::local> dgram { loop, 0 };
+				dgram.bind(make_address(server_dgram_path));
+
+				std::vector<std::byte> received(datagram_size);
+
+				/* exit the loop if nothing happens, so the test never hangs */
+				timer_event watchdog { loop, [&loop] (uint64_t) { loop.exit(); } };
+				watchdog.expires_in(std::chrono::seconds(5));
+
+				dgram.async_recvfrom(std::span<std::byte> { received },
+					[&loop, &dgram, &received] (ssize_t n, const family::local::address_type& src) {
+						if (n > 0)
+							dgram.sendto(std::span<std::byte> { received }.first(static_cast<size_t>(n)), msgflags::none, src);
+						loop.exit();
+					});
+
+				server_ready.store(true);
+				loop.run();
+				server_ok = true;
+			}
+			catch (const std::exception& e)
+			{
+				server_error = e.what();
+				server_ready.store(true);
+			}
+		} };
+
+		while (!server_ready.load())
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+		std::vector<std::byte> received(datagram_size);
+		bool echoed = false;
+		if (server_error.empty()) [[likely]]
+		{
+			ioloop loop;
+			async_datagramsocket<family::local> dgram { loop, 0 };
+			dgram.bind(make_address(client_dgram_path));
+
+			timer_event watchdog { loop, [&loop] (uint64_t) { loop.exit(); } };
+			watchdog.expires_in(std::chrono::seconds(5));
+
+			dgram.async_recvfrom(std::span<std::byte> { received },
+				[&] (ssize_t n, const family::local::address_type&) {
+					echoed = (n == static_cast<ssize_t>(datagram_size) && received == sent);
+					loop.exit();
+				});
+
+			dgram.sendto(std::span<const std::byte> { sent }, msgflags::none,
+			             make_address(server_dgram_path));
+
+			loop.run();
+		}
+
+		server.join();
+		::unlink(server_dgram_path);
+		::unlink(client_dgram_path);
+
+		assert_equal(server_ok, true);
+		assert_equal(echoed, true);
+
+		return {};
+	}
+
 public:
 	tests_type tests() const override
 	{
 		return {
 			{ "test_echo", [&] () { return test_echo(); } },
+			{ "test_echo_datagram", [&] () { return test_echo_datagram(); } },
 		};
 	}
 };

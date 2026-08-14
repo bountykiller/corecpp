@@ -28,7 +28,7 @@ enum class socktype : int16_t
 
 enum struct msgflags
 {
-	none        = 0,       /*<! process out-of-band data */
+	none        = 0,
 	out_of_band = MSG_OOB,       /*<! process out-of-band data */
 	dont_route  = MSG_DONTROUTE, /*<! bypass routing, use direct interface */
 	end_of_rec	= MSG_EOR,       /*<! data completes record	*/
@@ -208,12 +208,21 @@ public:
 	datagramsocket(const datagramsocket& other) = delete;
 	datagramsocket& operator=(const datagramsocket &) = delete;
 
+	void bind(const DomainT::address_type &addr) const
+	{
+		int ret = ::bind(m_fd, reinterpret_cast<const struct sockaddr*>(&addr),
+						 DomainT::address_len(addr));
+		if ( ret )
+			corecpp::throw_system_error(errno, std::system_category());
+	}
+
 	ssize_t sendto(const std::span<const std::byte> buffer, msgflags flags, const DomainT::address_type &dest)
 	{
 		if (buffer.empty()) [[unlikely]]
 			return 0;
 
-		return ::sendto(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags), dest, DomainT::address_len(dest));
+		return ::sendto(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags),
+		                reinterpret_cast<const struct sockaddr*>(&dest), DomainT::address_len(dest));
 	}
 
 	ssize_t sendto(const std::span<const std::byte> buffer, msgflags flags, const DomainT::address_type &dest, std::chrono::milliseconds timeout)
@@ -239,12 +248,16 @@ public:
 			return -1;
 		}
 
-		return ::sendto(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags), dest, DomainT::address_len(dest));
+		return ::sendto(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags),
+		                reinterpret_cast<const struct sockaddr*>(&dest), DomainT::address_len(dest));
 	}
 
-	ssize_t recvfrom(std::span<std::byte> buffer, msgflags flags, const DomainT::address_type &src)
+	ssize_t recvfrom(std::span<std::byte> buffer, msgflags flags, DomainT::address_type* src = nullptr)
 	{
-		return ::recvfrom(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags), src, sizeof(src));
+		socklen_t src_len = sizeof(typename DomainT::address_type);
+		socklen_t* len_ptr = src == nullptr ? nullptr : &src_len;
+		return ::recvfrom(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags),
+		                  reinterpret_cast<struct sockaddr*>(src), len_ptr);
 	}
 
 protected:

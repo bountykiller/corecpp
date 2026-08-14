@@ -65,6 +65,15 @@ void ioloop::add(int fd, event& e, uint32_t events)
 	}
 }
 
+void ioloop::modify(int fd, uint32_t events)
+{
+	io_logger().info("Modify fd", std::to_string(fd), __FILE__, __LINE__);
+
+	epoll_event event { .events = events, .data = { .fd = fd } };
+	if ( epoll_ctl(m_fd, EPOLL_CTL_MOD, fd, &event) != 0 ) [[unlikely]]
+		throw_system_error(errno, std::system_category());
+}
+
 void ioloop::remove(int fd)
 {
 	io_logger().info("Remove fd", std::to_string(fd), __FILE__, __LINE__);

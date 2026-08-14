@@ -18,6 +18,7 @@
 #include <pthread.h>
 
 #include <corecpp/file.h>
+#include <corecpp/flags.h>
 #include <corecpp/except.h>
 #include <corecpp/expected.h>
 #include <corecpp/io/socket.h>
@@ -53,6 +54,7 @@ class ioloop final : public filedesc
 		*/
 		int run();
 		void add(int fd, event& e, uint32_t events = EPOLLIN);
+		void modify(int fd, uint32_t events);
 		void remove(int fd);
 
 	private:
@@ -87,6 +89,8 @@ protected:
 		if ( m_ident != -1 )
 		{
 			ensure(ident == m_ident); //should I call unsubscribe otherwise?
+			m_loop.modify(ident, events);
+			m_once = once;
 			return;
 		}
 
@@ -501,6 +505,102 @@ class async_socket_acceptor : public socket_acceptor<DomainT>, public event
 		}
 
 		accept_action m_accept_action;
+};
+
+/**
+ * \brief Represents an asynchronous datagram socket driven by an ioloop.
+ *
+ * The async_datagramsocket class is used to manage datagram socket events
+ * within an ioloop. It allows scheduling of send and receive events and
+ * provides automatic cancellation when the async_datagramsocket object is
+ * destroyed.
+ */
+template <typename DomainT>
+class async_datagramsocket : public datagramsocket<DomainT>, public event
+{
+	public:
+		using recv_action = std::function<void(ssize_t, const typename DomainT::address_type&)>;
+		using send_action = std::function<void(ssize_t)>;
+
+		async_datagramsocket(ioloop& loop, int protocol)
+		: datagramsocket<DomainT> { protocol },
+		  event { loop, on_action },
+		  m_recv_buffer { },
+		  m_send_buffer { },
+		  m_dest { },
+		  m_recv_action { },
+		  m_send_action { }
+		{
+		}
+
+		/**
+		* Asynchronously receive a datagram into the given buffer.
+		*
+		* @param buffer The buffer that will receive the datagram.
+		* @param action The callback invoked once a datagram has been received,
+		*        with the number of bytes read (or -1 on error) and the source
+		*        address of the datagram.
+		*/
+		void async_recvfrom(std::span<std::byte> buffer, recv_action &&action)
+		{
+			m_recv_buffer = buffer;
+			m_recv_action = std::move(action);
+			event::subscribe(datagramsocket<DomainT>::m_fd, false, EPOLLIN);
+		}
+
+		/**
+		* Asynchronously send a datagram to the given destination.
+		*
+		* @param buffer The buffer containing the datagram to send.
+		* @param dest The address to send the datagram to.
+		* @param action The callback invoked once the datagram has been sent,
+		*        with the number of bytes sent (or -1 on error).
+		*/
+		void async_sendto(const std::span<const std::byte> buffer, const DomainT::address_type &dest, send_action &&action)
+		{
+			m_send_buffer = buffer;
+			m_dest = dest;
+			m_send_action = std::move(action);
+			event::subscribe(datagramsocket<DomainT>::m_fd, false, EPOLLOUT);
+		}
+
+		~async_datagramsocket()
+		{
+			unsubscribe();
+		}
+
+	private:
+
+		static void on_action(event& ev, uint32_t events)
+		{
+			// we are called with a reference to ourselves, since we inherit
+			// from event, so we can cast it back
+			async_datagramsocket& socket = static_cast<async_datagramsocket&>(ev);
+			if ( events & EPOLLIN )
+				socket.on_recv();
+			if ( events & EPOLLOUT )
+				socket.on_send();
+		}
+
+		void on_recv()
+		{
+			typename DomainT::address_type recv_src;
+			ssize_t n = datagramsocket<DomainT>::recvfrom(m_recv_buffer, msgflags::nosignal, &recv_src);
+			m_recv_action(n, recv_src);
+		}
+
+		void on_send()
+		{
+			ssize_t n = datagramsocket<DomainT>::sendto(m_send_buffer, msgflags::dont_wait | msgflags::nosignal, m_dest);
+			m_send_action(n);
+		}
+
+		std::span<std::byte> m_recv_buffer;
+		std::span<const std::byte> m_send_buffer;
+		DomainT::address_type m_dest;
+		msgflags m_flags;
+		recv_action m_recv_action;
+		send_action m_send_action;
 };
 
 }
