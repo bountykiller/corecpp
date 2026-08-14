@@ -10,6 +10,7 @@
 
 #include <corecpp/except.h>
 #include <corecpp/file.h>
+#include <corecpp/flags.h>
 #include <corecpp/meta/reflection.h>
 #include <corecpp/io/domain.h>
 
@@ -101,14 +102,14 @@ public:
 		                 DomainT::address_len(dest));
 	}
 
-	ssize_t send(const std::span<const std::byte> buffer, msgflags flags)
+	ssize_t send(const std::span<const std::byte> buffer, const flags<msgflags> flags)
 	{
 		if (buffer.empty()) [[unlikely]]
 			return 0;
-		return ::send(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags));
+		return ::send(m_fd, buffer.data(), buffer.size(), flags.get());
 	}
 
-	ssize_t send(const std::span<const std::byte> buffer, msgflags flags, std::chrono::milliseconds timeout)
+	ssize_t send(const std::span<const std::byte> buffer, const flags<msgflags> flags, std::chrono::milliseconds timeout)
 	{
 		if (buffer.empty()) [[unlikely]]
 			return 0;
@@ -131,12 +132,12 @@ public:
 			return -1;
 		}
 
-		return ::send(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags));
+		return ::send(m_fd, buffer.data(), buffer.size(), flags.get());
 	}
 
-	ssize_t recv(std::span<std::byte> buffer, msgflags flags)
+	ssize_t recv(std::span<std::byte> buffer, const flags<msgflags> flags)
 	{
-		return ::recv(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags));
+		return ::recv(m_fd, buffer.data(), buffer.size(), flags.get());
 	}
 
 protected:
@@ -216,16 +217,16 @@ public:
 			corecpp::throw_system_error(errno, std::system_category());
 	}
 
-	ssize_t sendto(const std::span<const std::byte> buffer, msgflags flags, const DomainT::address_type &dest)
+	ssize_t sendto(const std::span<const std::byte> buffer, const flags<msgflags> flags, const DomainT::address_type &dest)
 	{
 		if (buffer.empty()) [[unlikely]]
 			return 0;
 
-		return ::sendto(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags),
+		return ::sendto(m_fd, buffer.data(), buffer.size(), flags.get(),
 		                reinterpret_cast<const struct sockaddr*>(&dest), DomainT::address_len(dest));
 	}
 
-	ssize_t sendto(const std::span<const std::byte> buffer, msgflags flags, const DomainT::address_type &dest, std::chrono::milliseconds timeout)
+	ssize_t sendto(const std::span<const std::byte> buffer, const flags<msgflags> flags, const DomainT::address_type &dest, std::chrono::milliseconds timeout)
 	{
 		if (buffer.empty()) [[unlikely]]
 			return 0;
@@ -248,15 +249,15 @@ public:
 			return -1;
 		}
 
-		return ::sendto(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags),
+		return ::sendto(m_fd, buffer.data(), buffer.size(), flags.get(),
 		                reinterpret_cast<const struct sockaddr*>(&dest), DomainT::address_len(dest));
 	}
 
-	ssize_t recvfrom(std::span<std::byte> buffer, msgflags flags, DomainT::address_type* src = nullptr)
+	ssize_t recvfrom(std::span<std::byte> buffer, const flags<msgflags> flags, DomainT::address_type* src = nullptr)
 	{
 		socklen_t src_len = sizeof(typename DomainT::address_type);
 		socklen_t* len_ptr = src == nullptr ? nullptr : &src_len;
-		return ::recvfrom(m_fd, buffer.data(), buffer.size(), corecpp::to_underlying(flags),
+		return ::recvfrom(m_fd, buffer.data(), buffer.size(), flags.get(),
 		                  reinterpret_cast<struct sockaddr*>(src), len_ptr);
 	}
 
