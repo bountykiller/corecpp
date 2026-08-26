@@ -145,7 +145,7 @@ class test_operators final : public test_fixture
 		});
 	}
 public:
-	tests_type tests() const override
+	tests_type tests() override
 	{
 		return {
 			{ "test_and", [&] () { return test_and(); } },

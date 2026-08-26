@@ -171,7 +171,7 @@ class test_reflection final : public test_fixture
 	}
 
 public:
-	tests_type tests() const override
+	tests_type tests() override
 	{
 		return {
 			{ "test_is_iterable", [&] () { return test_is_iterable(); } },

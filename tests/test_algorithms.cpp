@@ -79,7 +79,7 @@ class test_get_or_def final : public test_fixture
 		});
 	}
 public:
-	tests_type tests() const override
+	tests_type tests() override
 	{
 		return {
 			{ "test_pointer_to_char", [&] () { return test_pchar(); } },
@@ -87,13 +87,55 @@ public:
 			{ "test_pointer", [&] () { return test_pointer(); } },
 		};
 	}
-
 };
+
+class test_next_power_of_2 final : public test_fixture
+{
+
+	test_case_result test() const
+	{
+		struct test { size_t in; size_t expected; };
+		test_cases<test> cases ({
+			{ 0, 1 },
+			{ 1, 1 },
+			{ 2, 2 },
+			{ 3, 4 },
+			{ 4, 4 },
+			{ 5, 8 },
+			{ 7, 8 },
+			{ 8, 8 },
+			{ 9, 16 },
+			{ 17, 32 },
+			{ 33, 64 },
+			{ 65, 128},
+			{ 255, 256},
+			{ 333, 512},
+			{ 1000, 1024},
+			{ 2001, 2048},
+			{ 3003, 4096},
+		});
+
+		return run(cases, [&](const test& t){
+			auto res = corecpp::next_power_of_2(t.in);
+			assert_equal(res, t.expected);
+		});
+	}
+
+public:
+	tests_type tests() override
+	{
+		return {
+			{ "test", [&] () { return test(); } }
+		};
+	}
+};
+
 
 int main(int argc, char** argv)
 {
 	test_unit unit { "Algotithms" };
 	unit.add_fixture<test_get_or_def>("test_get_or_def");
+	unit.add_fixture<test_next_power_of_2>("test_next_power_of_2");
 
 	return unit.run(argc, argv);
 };

@@ -1,12 +1,11 @@
 #ifndef CORE_CPP_EXCEPT_H
 #define CORE_CPP_EXCEPT_H
 
+#include <format>
 #include <memory>
 #include <stdexcept>
 #include <string_view>
-#if __cplusplus > 201703L
 #include <source_location>
-#endif
 
 #include <corecpp/algorithm.h>
 
@@ -20,35 +19,19 @@ namespace corecpp
 	template <typename ExceptionT>
 	class error : public ExceptionT
 	{
-#if __cplusplus > 201703L
 		std::source_location m_location;
-
-		template <typename StringT>
-		std::string build_message(StringT&& message) noexcept
-		{
-			return corecpp::concat<std::string>({" at ", std::string { m_location.file_name() },
-												":", std::to_string(m_location.line()),
-												" ", std::forward<StringT>(message)});
-		}
-#endif
 
 	public:
 		template <typename StringT>
-#if __cplusplus > 201703L
-		error(StringT&& message, const std::source_location& location = std::source_location::current())
-		: ExceptionT(build_message(std::forward<StringT>(message))), m_location(location)
-#else
-		error(StringT&& message)
-		: ExceptionT(std::forward<StringT>(message))
-#endif
+		error(StringT&& message, const std::source_location& location = std::source_location::current()) :
+			ExceptionT(std::format(" at {}:{} {} ", location.file_name(), location.line(), std::forward<StringT>(message))),
+			m_location(location)
 		{}
 
-#if __cplusplus > 201703L
 		constexpr const std::source_location& location() const noexcept
 		{
 			return m_location;
 		}
-#endif
 	};
 
 	struct unimplemented : public error<std::logic_error>

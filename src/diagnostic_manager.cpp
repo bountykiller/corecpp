@@ -43,7 +43,6 @@ void channel::diagnose(record message, params& parameters)
 	parameters.output.append(message);
 }
 
-
 void channel::diagnose(diagnostic_level level, std::string message, std::function<std::string()> details, std::string file, uint line)
 {
 	decltype(m_params) p;
@@ -82,7 +81,49 @@ void channel::diagnose(diagnostic_level level, std::string message, std::string 
 		p = m_params;
 	}
 	if(p->level < level) return;
-	diagnose({ level, std::move(message), {}, std::move(file), line, std::chrono::system_clock::now() }, *p);
+		diagnose({ level, std::move(message), {}, std::move(file), line, std::chrono::system_clock::now() }, *p);
+}
+
+
+void channel::diagnose(diagnostic_level level, std::string message, std::function<std::string()> details, std::source_location location)
+{
+	decltype(m_params) p;
+	{
+		std::lock_guard<std::mutex> lock(m_mutex);
+		p = m_params;
+	}
+	if(p->level < level) return;
+	if(p->level > level || level == diagnostic_level::debug)
+		diagnose({ level, std::move(message), details(), location.file_name(), location.line(), std::chrono::system_clock::now() }, *p);
+	else
+		diagnose({ level, std::move(message), {}, location.file_name(), location.line(), std::chrono::system_clock::now() }, *p);
+}
+
+
+void channel::diagnose(diagnostic_level level, std::string message, std::string details, std::source_location location)
+{
+	decltype(m_params) p;
+	{
+		std::lock_guard<std::mutex> lock(m_mutex);
+		p = m_params;
+	}
+	if(p->level < level) return;
+	if(p->level > level || level == diagnostic_level::debug)
+		diagnose({ level, std::move(message), std::move(details), location.file_name(), location.line(), std::chrono::system_clock::now() }, *p);
+	else
+		diagnose({ level, std::move(message), {}, location.file_name(), location.line(), std::chrono::system_clock::now() }, *p);
+}
+
+
+void channel::diagnose(diagnostic_level level, std::string message, std::source_location location)
+{
+	decltype(m_params) p;
+	{
+		std::lock_guard<std::mutex> lock(m_mutex);
+		p = m_params;
+	}
+	if(p->level < level) return;
+	diagnose({ level, std::move(message), {}, location.file_name(), location.line(), std::chrono::system_clock::now() }, *p);
 }
 
 

@@ -157,7 +157,7 @@ namespace corecpp
 			serializer.serialize(actual);
 			oss << "\texpected:";
 			serializer.serialize(expected);
-			logger().fail(oss.str(), __FILE__, __LINE__);
+			logger().fail(oss.str());
 			m_errors.emplace_back(oss.str());
 		}
 
@@ -169,7 +169,7 @@ namespace corecpp
 			if (!res)
 				register_failure(actual, expected);
 			else
-				logger().success("", [this]{ return corecpp::concat<std::string>({"Success at index ", std::to_string(m_current_test_index)}); }, __FILE__, __LINE__);
+				logger().success("", [this]{ return corecpp::concat<std::string>({"Success at index ", std::to_string(m_current_test_index)}); });
 		}
 
 		template <typename T, template<typename U> class Op>
@@ -187,13 +187,13 @@ namespace corecpp
 				serializer.serialize(actual);
 				oss << "\texpected:";
 				serializer.serialize(expected);
-				logger().fatal(oss.str(), __FILE__, __LINE__);
+				logger().fatal(oss.str());
 				m_errors.emplace_back(oss.str());
 
 				corecpp::throws<assertion_error>(oss.str());
 			}
 			else
-				logger().success("", [this]{ return corecpp::concat<std::string>({"Success at index ", std::to_string(m_current_test_index)}); }, __FILE__, __LINE__);
+				logger().success("", [this]{ return corecpp::concat<std::string>({"Success at index ", std::to_string(m_current_test_index)}); });
 		}
 
 	protected:
@@ -310,7 +310,7 @@ namespace corecpp
 			for (const auto& test : tests)
 			{
 				try {
-					logger().info("Running test ", std::to_string(m_current_test_index) , __FILE__, __LINE__);
+					logger().info(std::format("Running test {}", m_current_test_index));
 					fn(test);
 				}
 				catch(const assertion_error& ae)
@@ -322,7 +322,7 @@ namespace corecpp
 
 					m_result = test_result::EXCEPT;
 					oss << "Exception at test " << m_current_test_index <<  ": " << e.what();
-					logger().error(oss.str(), __FILE__, __LINE__);
+					logger().error(oss.str());
 					m_errors.emplace_back(oss.str());
 				}
 				++m_current_test_index;
@@ -342,6 +342,10 @@ namespace corecpp
 			{
 				reset();
 				result = test();
+			}
+			catch (const std::exception& e)
+			{
+				result = { test_result::FATAL, { std::format("Uncaught error: {}", e.what()) } };
 			}
 			catch (...)
 			{
@@ -425,7 +429,7 @@ namespace corecpp
 		virtual void setup() { m_setted = true; }
 		virtual void reset() { }
 		virtual void teardown() { m_setted = false; }
-		virtual tests_type tests() const = 0;
+		virtual tests_type tests() = 0;
 	};
 
 	class test_unit final

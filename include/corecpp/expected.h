@@ -69,12 +69,10 @@ namespace corecpp
 	 * \details if an error is detected, this method will throw an exception.
 	 * Since she'd marked as noexcept, this will result in std::terminate being called
 	 */
-	static inline void ensure(bool condition) noexcept
+	static inline void ensure(bool condition, const std::source_location& location = std::source_location::current()) noexcept
 	{
-		if ( condition ) [[likely]]
-			return;
-
-		throws<unexpected_error>("The unexpected happenend: false != true !!!");
+		if (!condition) [[unlikely]]
+			throws<unexpected_error>("The unexpected happenend!!!", location);
 	}
 
 	/**
@@ -83,12 +81,10 @@ namespace corecpp
 	 * \details if an error is detected, this method will throw an exception.
 	 * Since she'd marked as noexcept, this will result in std::terminate being called
 	 */
-	static inline void ensure(bool condition, const char *what) noexcept
+	static inline void ensure(bool condition, const char *what, const std::source_location& location = std::source_location::current()) noexcept
 	{
-		if ( condition ) [[likely]]
-			return;
-
-		throws<unexpected_error>(what);
+		if (!condition) [[unlikely]]
+			throws<unexpected_error>(what, location);
 	}
 
 	/**
@@ -98,12 +94,10 @@ namespace corecpp
 	 * Since she'd marked as noexcept, this will result in std::terminate being called
 	 */
 	template<typename TValue>
-	static inline void ensure(const TValue& expected, const TValue &actual)  noexcept
+	static inline void ensure_equal(const TValue& actual, const TValue &expected, const std::source_location& location = std::source_location::current()) noexcept
 	{
-		if ( expected == actual ) [[likely]]
-			return;
-
-		throws<unexpected_error>(std::format("The unexpected happenend: got {} instead of {} !!!", expected, actual));
+		if (actual != expected) [[unlikely]]
+			throws<unexpected_error>(std::format("The unexpected happenend: got {} instead of {} !!!", expected, actual), location);
 	}
 
 	/**
@@ -114,10 +108,8 @@ namespace corecpp
 	 */
 	static inline void unsupported(bool condition) noexcept
 	{
-		if ( !condition ) [[likely]]
-			return;
-
-		throws<unimplemented>(std::format("Unsupported case happened"));
+		if ( condition ) [[unlikely]]
+			throws<unimplemented>(std::format("Unsupported case happened"));
 	}
 }
 

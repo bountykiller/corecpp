@@ -249,5 +249,21 @@ namespace corecpp
 		}
 		return false;
 	}
+
+	static size_t next_power_of_2(size_t count)
+	{
+		if (count == 0)
+			return 1;
+		count--;
+		count |= count >> 1;
+		count |= count >> 2;
+		count |= count >> 4;
+		count |= count >> 8;
+		count |= count >> 16;
+		if (sizeof(size_t) > 32)
+			count |= count >> 32;
+		count++;
+		return count;
+	}
 }
 #endif

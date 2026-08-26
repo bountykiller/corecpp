@@ -196,7 +196,7 @@ class test_option final : public test_fixture
 	}
 
 public:
-	tests_type tests() const override
+	tests_type tests() override
 	{
 		/* TODO:
 		 * Add tests for utf8 & co
@@ -327,7 +327,7 @@ class test_parser final : public test_fixture
 	}
 
 public:
-	tests_type tests() const override
+	tests_type tests() override
 	{
 		return {
 			{ "test_options_parser", [&] () { return test_options(); } },

@@ -216,7 +216,9 @@ public:
 	void diagnose(diagnostic_level level, std::string message, std::string file, uint line);
 	void diagnose(diagnostic_level level, std::string message, std::string details, std::string file, uint line);
 	void diagnose(diagnostic_level level, std::string message, std::function<std::string()> details, std::string file, uint line);
-	// TODO Use const std::source_location location = std::source_location::current()
+	void diagnose(diagnostic_level level, std::string message, std::string details, std::source_location location);
+	void diagnose(diagnostic_level level, std::string message, std::function<std::string()> details, std::source_location location);
+	void diagnose(diagnostic_level level, std::string message, std::source_location location);
 };
 
 
@@ -268,12 +270,18 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::fatal, std::move(message), std::move(details), std::move(file), line);
 	}
-#ifdef __cpp_lib_source_location
 	void fatal(std::string message, std::function<std::string()> details, const std::source_location& location = std::source_location::current())
 	{
 		m_channel.diagnose(diagnostic_level::fatal, std::move(message), std::move(details), location.file_name(), location.line());
 	}
-#endif
+	void fatal(std::string message, std::string details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::fatal, std::move(message), std::move(details), location.file_name(), location.line());
+	}
+	void fatal(std::string message, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::fatal, std::move(message), location.file_name(), location.line());
+	}
 
 	void error(std::string message, std::string file, uint line) const
 	{
@@ -286,6 +294,18 @@ public:
 	void error(std::string message, std::function<std::string()> details, std::string file, uint line)
 	{
 		m_channel.diagnose(diagnostic_level::error, std::move(message), std::move(details), std::move(file), line);
+	}
+	void error(std::string message, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::error, std::move(message), location.file_name(), location.line());
+	}
+	void error(std::string message, std::string details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::error, std::move(message), std::move(details), location.file_name(), location.line());
+	}
+	void error(std::string message, std::function<std::string()> details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::error, std::move(message), std::move(details), location.file_name(), location.line());
 	}
 
 	void warn(std::string message, std::string file, uint line) const
@@ -300,6 +320,18 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::warning, std::move(message), std::move(details), std::move(file), line);
 	}
+	void warn(std::string message, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::warning, std::move(message), location.file_name(), location.line());
+	}
+	void warn(std::string message, std::string details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::warning, std::move(message), std::move(details), location.file_name(), location.line());
+	}
+	void warn(std::string message, std::function<std::string()> details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::warning, std::move(message), std::move(details), location.file_name(), location.line());
+	}
 
 	void fail(std::string message, std::string file, uint line) const
 	{
@@ -312,6 +344,18 @@ public:
 	void fail(std::string message, std::function<std::string()> details, std::string file, uint line)
 	{
 		m_channel.diagnose(diagnostic_level::faillure, std::move(message), std::move(details), std::move(file), line);
+	}
+	void fail(std::string message, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::faillure, std::move(message), location.file_name(), location.line());
+	}
+	void fail(std::string message, std::string details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::faillure, std::move(message), std::move(details), location.file_name(), location.line());
+	}
+	void fail(std::string message, std::function<std::string()> details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::faillure, std::move(message), std::move(details), location.file_name(), location.line());
 	}
 
 	void success(std::string message, std::string file, uint line) const
@@ -326,6 +370,18 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::success, std::move(message), std::move(details), std::move(file), line);
 	}
+	void success(std::string message, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::success, std::move(message), location.file_name(), location.line());
+	}
+	void success(std::string message, std::string details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::success, std::move(message), std::move(details), location.file_name(), location.line());
+	}
+	void success(std::string message, std::function<std::string()> details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::success, std::move(message), std::move(details), location.file_name(), location.line());
+	}
 
 	void info(std::string message, std::string file, uint line) const
 	{
@@ -338,6 +394,18 @@ public:
 	void info(std::string message, std::function<std::string()> details, std::string file, uint line)
 	{
 		m_channel.diagnose(diagnostic_level::info, std::move(message), std::move(details), std::move(file), line);
+	}
+	void info(std::string message, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::info, std::move(message), location.file_name(), location.line());
+	}
+	void info(std::string message, std::string details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::info, std::move(message), std::move(details), location.file_name(), location.line());
+	}
+	void info(std::string message, std::function<std::string()> details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::info, std::move(message), std::move(details), location.file_name(), location.line());
 	}
 
 	void trace(std::string message, std::string file, uint line) const
@@ -352,6 +420,18 @@ public:
 	{
 		m_channel.diagnose(diagnostic_level::trace, std::move(message), std::move(details), std::move(file), line);
 	}
+	void trace(std::string message, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::trace, std::move(message), location.file_name(), location.line());
+	}
+	void trace(std::string message, std::string details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::trace, std::move(message), std::move(details), location.file_name(), location.line());
+	}
+	void trace(std::string message, std::function<std::string()> details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::trace, std::move(message), std::move(details), location.file_name(), location.line());
+	}
 
 	void debug(std::string message, std::string file, uint line) const
 	{
@@ -364,6 +444,18 @@ public:
 	void debug(std::string message, std::function<std::string()> details, std::string file, uint line)
 	{
 		m_channel.diagnose(diagnostic_level::debug, std::move(message), std::move(details), std::move(file), line);
+	}
+	void debug(std::string message, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::debug, std::move(message), location.file_name(), location.line());
+	}
+	void debug(std::string message, std::string details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::debug, std::move(message), std::move(details), location.file_name(), location.line());
+	}
+	void debug(std::string message, std::function<std::string()> details, const std::source_location& location = std::source_location::current())
+	{
+		m_channel.diagnose(diagnostic_level::debug, std::move(message), std::move(details), location.file_name(), location.line());
 	}
 };
 

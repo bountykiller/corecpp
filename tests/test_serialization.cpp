@@ -277,7 +277,7 @@ public:
 	}
 
 public:
-	tests_type tests() const override
+	tests_type tests() override
 	{
 		return {
 			{ "booleans", [&] () { return test_bool(); } },

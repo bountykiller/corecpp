@@ -54,19 +54,6 @@ private:
 		T *m_data;
 	};
 	block* m_block;
-
-	size_type next_power_of_2(size_type count)
-	{
-		count--;
-		count |= count >> 1;
-		count |= count >> 2;
-		count |= count >> 4;
-		count |= count >> 8;
-		count |= count >> 16;
-		if (sizeof(size_type) > 32)
-			count |= count >> 32;
-		count++;
-	}
 	void destroy()
 	{
 		if (m_block->m_refcount == 0)
