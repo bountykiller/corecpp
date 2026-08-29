@@ -11,7 +11,7 @@ struct ticker
 		m_loop { loop },
 		m_timer {
 			m_loop,
-			[this, once] (uint64_t)
+			[this, once] (corecpp::timer_event&, uint64_t)
 			{
 				return tick(once);
 			}

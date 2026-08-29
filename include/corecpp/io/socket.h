@@ -8,6 +8,8 @@
 
 #include <sys/socket.h>
 
+#include <algorithm>
+
 #include <corecpp/except.h>
 #include <corecpp/file.h>
 #include <corecpp/flags.h>
@@ -27,14 +29,21 @@ enum class socktype : int16_t
 };
 */
 
-enum struct msgflags
+template <int LevelT, int OptionT, typename ValueT>
+struct socket_option
 {
-	none        = 0,
-	out_of_band = MSG_OOB,       /*<! process out-of-band data */
-	dont_route  = MSG_DONTROUTE, /*<! bypass routing, use direct interface */
-	end_of_rec	= MSG_EOR,       /*<! data completes record	*/
-	dont_wait   = MSG_DONTWAIT,  /*<! do not block */
-	nosignal    = MSG_NOSIGNAL   /*<! do not generate SIGPIPE on EOF */
+	using value_type = ValueT;
+	static constexpr int level  = LevelT;
+	static constexpr int option = OptionT;
+	ValueT value;
+};
+
+template<typename T>
+concept SocketOption = requires (T opt)
+{
+	(std::is_same_v<int, typeof(T::level)>);
+	(std::is_same_v<int, typeof(T::option)>);
+	opt.value;
 };
 
 class socket : public filedesc
@@ -64,15 +73,15 @@ protected:
 		return static_cast<socket&>(filedesc::operator=(std::move(other)));
 	}
 
-	template<typename ValueT>
-	void set_option(int level, int option, const ValueT& value, socklen_t value_len = sizeof(ValueT))
+	template<SocketOption OptionT>
+	void set_option(const OptionT& opt)
 	{
-		if (setsockopt(m_fd, level, option, &value, value_len)) [[unlikely]]
+		if (setsockopt(m_fd, OptionT::level, OptionT::option, &opt.value, sizeof(opt.value))) [[unlikely]]
 			corecpp::throws<std::system_error>(errno, std::system_category());
 	}
-
-
 };
+
+
 template <typename DomainT>
 class socket_acceptor;
 
@@ -135,7 +144,7 @@ public:
 		return ::send(m_fd, buffer.data(), buffer.size(), flags.get());
 	}
 
-	ssize_t recv(std::span<std::byte> buffer, const flags<msgflags> flags)
+	ssize_t receive(std::span<std::byte> buffer, const flags<msgflags> flags)
 	{
 		return ::recv(m_fd, buffer.data(), buffer.size(), flags.get());
 	}

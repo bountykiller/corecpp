@@ -5,6 +5,9 @@ project(corecpp)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CORECPP_VERSION "0.8")
+
+add_compile_options("-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.")
+
 set(PKGCONFIG_DIR ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig)
 set(CMAKE_DIR ${CMAKE_INSTALL_PREFIX}/lib/cmake/corecpp)
 set(PKGCONFIG_FILES ${CMAKE_CURRENT_BINARY_DIR}/corecpp.pc)

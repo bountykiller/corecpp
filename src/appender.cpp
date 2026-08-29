@@ -46,35 +46,52 @@ formatter::formatter(const std::string& format)
 			case 'm':
 			{
 				std::string str(start, pos - 1);
-				m_functions.emplace_back([str](std::string& msg, const record& entry) { msg.append(str).append(entry.message); } );
+				m_functions.emplace_back(
+					[str](std::string& msg, const record& entry)
+					{ msg.append(str).append(entry.message); }
+				);
 				start = ++pos;
 				break;
 			}
 			case 'l':
 			{
 				std::string str(start, pos - 1);
-				m_functions.emplace_back([str](std::string& msg, const record& entry) { msg.append(str).append(std::to_string(entry.line)); } );
+				m_functions.emplace_back(
+					[str](std::string& msg, const record& entry)
+					{ msg.append(str).append(std::to_string(entry.line)); }
+				);
 				start = ++pos;
 				break;
 			}
 			case 'd':
 			{
 				std::string str(start, pos - 1);
-				m_functions.emplace_back([str](std::string& msg, const record& entry) { msg.append(str).append(entry.details); } );
+				m_functions.emplace_back(
+					[str](std::string& msg, const record& entry)
+					{ msg.append(str).append(entry.details); }
+				);
 				start = ++pos;
 				break;
 			}
 			case 'f':
 			{
 				std::string str(start, pos - 1);
-				m_functions.emplace_back([str](std::string& msg, const record& entry) { msg.append(str).append(entry.file); } );
+				m_functions.emplace_back(
+					[str](std::string& msg, const record& entry)
+					{
+						msg.append(str).append(entry.file);
+					});
 				start = ++pos;
 				break;
 			}
 			case 'g':
 			{
 				std::string str(start, pos - 1);
-				m_functions.emplace_back([str](std::string& msg, const record& entry) { msg.append(str).append(to_string(entry.level)); } );
+				m_functions.emplace_back(
+					[str](std::string& msg, const record& entry)
+					{
+						msg.append(str).append(to_string(entry.level));
+					});
 				start = ++pos;
 				break;
 			}
