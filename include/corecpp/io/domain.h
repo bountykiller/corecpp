@@ -25,11 +25,6 @@ struct local
 {
 	static constexpr int domain = PF_LOCAL;
 	using address_type = sockaddr_un;
-
-	static socklen_t address_len(const address_type& addr) noexcept
-	{
-		return SUN_LEN(&addr);
-	}
 };
 
 /**
@@ -40,11 +35,6 @@ struct inet
 {
 	static constexpr int domain = PF_INET;
 	using address_type = sockaddr_in;
-
-	static constexpr socklen_t address_len(const address_type& addr) noexcept
-	{
-		return sizeof(addr);
-	}
 };
 
 /**
@@ -55,11 +45,6 @@ struct inet6
 {
 	static constexpr int domain = PF_INET6;
 	using address_type = sockaddr_in6;
-
-	static constexpr socklen_t address_len(const address_type& addr) noexcept
-	{
-		return sizeof(addr);
-	}
 };
 
 /**
@@ -70,11 +55,6 @@ struct netlink
 {
 	static constexpr int domain = PF_NETLINK;
 	using address_type = sockaddr_nl;
-
-	static constexpr socklen_t address_len(const address_type& addr) noexcept
-	{
-		return sizeof(addr);
-	}
 };
 
 

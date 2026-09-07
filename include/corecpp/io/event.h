@@ -4,6 +4,7 @@
 #include <cassert>
 
 #include <chrono>
+#include <deque>
 #include <format>
 #include <functional>
 #include <map>
@@ -354,238 +355,285 @@ class signal_event : public signal_fd, public event
 template <typename DomainT>
 class async_streamsocket : public streamsocket<DomainT>, public event
 {
-	public:
-		using read_action = std::function<size_t(async_streamsocket&, std::span<const std::byte>)>;
-		using write_action = std::function<void(async_streamsocket&, int)>;
-		using connect_action = std::function<void(async_streamsocket&, int)>;
+public:
+	using read_action = std::function<size_t(async_streamsocket&, std::span<const std::byte>)>;
+	using write_action = std::function<void(async_streamsocket&, int)>;
+	using connect_action = std::function<void(async_streamsocket&, int)>;
 
-		async_streamsocket(ioloop& loop, int protocol) :
-			streamsocket<DomainT> { protocol },
-			event { loop, streamsocket<DomainT>::m_fd },
-			m_read_buffer  { },
-			m_minread { 0 },
-			m_write_buffer { },
-			m_read_action  { },
-			m_write_action { },
-			m_connect_action { }
-		{
-		}
+private:
+	istream_buffer m_istream_buffer;
+	size_t         m_minread;
+	size_t         m_readonce;
+	ostream_buffer m_ostream_buffer;
+	read_action    m_read_action;
+	write_action   m_write_action;
+	connect_action m_connect_action;
 
-		async_streamsocket(ioloop &loop, streamsocket<DomainT>&& other) :
-			streamsocket<DomainT> { std::move(other) },
-			event { loop, streamsocket<DomainT>::m_fd },
-			m_read_buffer  { },
-			m_minread { 0 },
-			m_write_buffer { },
-			m_read_action  { },
-			m_write_action { },
-			m_connect_action { }
-		{
-		}
+public:
 
-		/* TODO:
-		 * can't work because the callbacks may owns a reference to other
-		 * -> in async_accept, forward a (non-async) streamsocket<DomainT>
-		 */
-		async_streamsocket(async_streamsocket&& other) :
-			streamsocket<DomainT> { std::move(other) },
-			event { std::move(other) },
-			m_read_buffer  { std::move(other.m_read_buffer) },
-			m_minread { other.m_minread },
-			m_write_buffer { std::move(other.m_write_buffer) },
-			m_read_action  { std::move(other.m_read_action) },
-			m_write_action { std::move(other.m_write_action) },
-			m_connect_action { std::move(other.m_connect_action) }
-		{
-		}
-/*
-		async_streamsocket& operator =(async_streamsocket&& other)
-		{
-			if (*this == &other) [[ unlikely ]]
-				return *this;
+	async_streamsocket(ioloop& loop, int protocol) :
+		streamsocket<DomainT> { protocol },
+		event { loop, streamsocket<DomainT>::m_fd },
+		m_istream_buffer  { },
+		m_minread { 0 },
+		m_readonce { 0 },
+		m_ostream_buffer { },
+		m_read_action  { },
+		m_write_action { },
+		m_connect_action { }
+	{
+	}
 
-			streamsocket<DomainT>::operator =(std::move(other));
-			event::operator = (std::move(other)); // don't work here since assigning references does not work that way
-			m_read_buffer   = std::move(other.m_read_buffer);
-			m_minread       = std::move(other.m_minread);
-			m_write_buffer  = std::move(other.m_write_buffer);
-			m_read_action   = std::move(other.m_read_action);
-			m_write_action  = std::move(other.m_write_action);
-			m_connect_action= std::move(other.m_connect_action);
-			return *this;
-		}
-*/
-		/**
-		* Asynchronously connect the socket to the given address.
-		*
-		* The socket is put in non-blocking mode and subscribed to the ioloop
-		* until the connection is established.
-		*
-		* \param dest The address to connect to.
-		* \param action The callback invoked once the connection is settled,
-		*        with 0 on success or the errno value on failure.
+	async_streamsocket(ioloop &loop, streamsocket<DomainT>&& other) :
+		streamsocket<DomainT> { std::move(other) },
+		event { loop, streamsocket<DomainT>::m_fd },
+		m_istream_buffer  { },
+		m_minread { 0 },
+		m_readonce { 0 },
+		m_ostream_buffer { },
+		m_read_action  { },
+		m_write_action { },
+		m_connect_action { }
+	{
+	}
+
+	/* TODO:
+		* can't work because the callbacks may owns a reference to other
+		* -> in async_accept, forward a (non-async) streamsocket<DomainT>
 		*/
-		void async_connect(const DomainT::address_type &dest, connect_action &&action)
+	async_streamsocket(async_streamsocket&& other) :
+		streamsocket<DomainT> { std::move(other) },
+		event { std::move(other) },
+		m_istream_buffer  { std::move(other.m_istream_buffer) },
+		m_minread { other.m_minread },
+		m_readonce { other.m_readonce },
+		m_ostream_buffer { std::move(other.m_ostream_buffer) },
+		m_read_action  { std::move(other.m_read_action) },
+		m_write_action { std::move(other.m_write_action) },
+		m_connect_action { std::move(other.m_connect_action) }
+	{
+	}
+/*
+	async_streamsocket& operator =(async_streamsocket&& other)
+	{
+		if (*this == &other) [[ unlikely ]]
+			return *this;
+
+		streamsocket<DomainT>::operator =(std::move(other));
+		event::operator = (std::move(other)); // don't work here since assigning references does not work that way
+		m_istream_buffer   = std::move(other.m_istream_buffer);
+		m_minread       = std::move(other.m_minread);
+		m_ostream_buffer  = std::move(other.m_ostream_buffer);
+		m_read_action   = std::move(other.m_read_action);
+		m_write_action  = std::move(other.m_write_action);
+		m_connect_action= std::move(other.m_connect_action);
+		return *this;
+	}
+*/
+	/**
+	* Asynchronously connect the socket to the given address.
+	*
+	* The socket is put in non-blocking mode and subscribed to the ioloop
+	* until the connection is established.
+	*
+	* \param dest The address to connect to.
+	* \param action The callback invoked once the connection is settled,
+	*        with 0 on success or the errno value on failure.
+	*/
+	void async_connect(const DomainT::address_type &dest, connect_action &&action)
+	{
+		int flags = fcntl(F_GETFL, 0);
+		if ( flags != -1 ) [[likely]]
+			fcntl(F_SETFL, flags | O_NONBLOCK);
+
+		m_connect_action = std::move(action);
+		int res = streamsocket<DomainT>::connect(dest);
+		if ( res == 0 ) [[likely]]
 		{
-			int flags = fcntl(F_GETFL, 0);
-			if ( flags != -1 ) [[likely]]
-				fcntl(F_SETFL, flags | O_NONBLOCK);
-
-			m_connect_action = std::move(action);
-			int res = streamsocket<DomainT>::connect(dest);
-			if ( res == 0 ) [[likely]]
-			{
-				m_loop.post(
-					[this]()
-					{
-						on_connect(0);
-					});
-				return;
-			}
-			if ( errno != EINPROGRESS && errno != EINTR && errno != EAGAIN ) [[unlikely]]
-			{
-				m_loop.post(
-					[this]()
-					{
-						on_connect(errno);
-					});
-				return;
-			}
-
-			/* the connection is being established, wait for the socket to become writable */
-			event::subscribe(true, EPOLLOUT);
+			m_loop.post(
+				[this]()
+				{
+					on_connect(0);
+				});
+			return;
+		}
+		if ( errno != EINPROGRESS && errno != EINTR && errno != EAGAIN ) [[unlikely]]
+		{
+			m_loop.post(
+				[this]()
+				{
+					on_connect(errno);
+				});
+			return;
 		}
 
-		/**
-		* Asynchronously read data from the socket into the given buffer.
+		/* the connection is being established, wait for the socket to become writable */
+		event::subscribe(true, EPOLLOUT);
+	}
+
+	/**
+		* Set the method called when receiving data
 		*
-		* \param bytes The amount of bytes we want to receive
 		* \param action The callback invoked once data has been read, with the
 		*        number of bytes read (or -1 on error).
 		*/
-		void async_recv(size_t bytes, read_action &&action)
-		{
-			m_read_action = std::move(action);
-			m_minread = bytes;
-			event::subscribe(false, EPOLLIN);
+	void on_async_recv(read_action &&action)
+	{
+		m_read_action = std::move(action);
+	}
 
-			if ( m_read_buffer.in_avail() > 0 && m_minread <= m_read_buffer.in_avail() )
-			{
-				m_loop.post(
-					[this]()
-					{
-						consume_received();
-					}
-				);
-			}
-		}
-
-		/**
-		* Asynchronously send data from the given buffer through the socket.
+	/**
+		* Asynchronously read data from the socket
 		*
-		* \param buffer The buffer containing the data to send.
+		* \param bytes The amount of bytes we want to receive
+		* \param once if true, after one successful read we'll stop looking for incoming packets. if false, we'll look
+		* for incoming packets indefinitively.
+		*
+		* \remarks successive calls to this methode will override the previous ones
+		*/
+	void async_recv(size_t bytes, bool once)
+	{
+		m_minread = bytes;
+		m_readonce = once;
+		event::subscribe(false, EPOLLIN);
+
+		if ( m_istream_buffer.in_avail() > 0 && m_minread <= m_istream_buffer.in_avail() )
+		{
+			m_loop.post(
+				[this]()
+				{
+					consume_received();
+				}
+			);
+		}
+	}
+
+	/**
+		* Set the method called when data have been sent
+		*
 		* \param action The callback invoked once data has been sent, with the
 		*        number of bytes sent (or -1 on error).
 		*/
-		void async_send(std::span<const std::byte> buffer, write_action &&action)
-		{
-			bool schedule = m_write_buffer.empty();
-			m_write_buffer.enqueue(buffer);
-			if ( action )
-			{
-				m_write_action = std::move(action);
-				if ( schedule )
-					event::subscribe(false, EPOLLOUT);
-			}
-		}
+	void on_async_sent(write_action &&action)
+	{
+		m_write_action = std::move(action);
+	}
 
-		~async_streamsocket()
-		{
-		}
+	/**
+		* Asynchronously send data from the given buffer through the socket.
+		*
+		* \param buffer The buffer containing the data to send.
+		*/
+	void async_send(std::span<const std::byte> buffer)
+	{
+		bool schedule = m_ostream_buffer.empty() && m_write_action;
+		m_ostream_buffer.enqueue(buffer);
+		if ( schedule )
+			event::subscribe(false, EPOLLOUT);
+	}
 
-	private:
-		void on_event(uint32_t events)
-		{
-			if ( events & EPOLLIN )
-				on_read();
-			if ( events & EPOLLOUT )
-			{
-				if ( m_connect_action )
-					on_connect();
-				else
-					on_write();
-			}
-		}
+	~async_streamsocket()
+	{
+	}
 
-		void on_connect()
-		{
-			int err = 0;
-			io_logger().info(std::format("fd {}: connected", streamsocket<DomainT>::get()), std::to_string(err), __FILE__, __LINE__);
-			socklen_t len = sizeof(err);
-			getsockopt(streamsocket<DomainT>::m_fd, SOL_SOCKET, SO_ERROR, &err, &len);
-			on_connect(err);
-		}
+private:
 
-		void on_connect(int error)
-		{
-			m_connect_action(*this, error);
-			m_connect_action = nullptr;
-		}
+	void on_connect()
+	{
+		int err = 0;
+		io_logger().info(std::format("fd {}: connected", streamsocket<DomainT>::get()), std::to_string(err), __FILE__, __LINE__);
+		socklen_t len = sizeof(err);
+		getsockopt(streamsocket<DomainT>::m_fd, SOL_SOCKET, SO_ERROR, &err, &len);
+		on_connect(err);
+	}
 
-		void on_read()
-		{
-			io_logger().info(std::format("fd {}: receiving data", streamsocket<DomainT>::get()));
-			int available;
-			int ret = streamsocket<DomainT>::ioctl(FIONREAD, &available);
-			if (ret < 0) [[unlikely]]
-				corecpp::throw_system_error(errno, std::system_category());
+	void on_connect(int error)
+	{
+		m_connect_action(*this, error);
+		m_connect_action = nullptr;
+	}
 
-			ret = m_read_buffer.receive(streamsocket<DomainT>::get(), msgflags::nosignal | msgflags::dont_wait, available);
-			switch ( ret )
-			{
-				case 0:
-					consume_received();
-					break;
-				case EPIPE:
-				case ECONNRESET:
+	void on_read()
+	{
+
+		int ret = m_istream_buffer.receive(streamsocket<DomainT>::get(), msgflags::nosignal | msgflags::dont_wait, m_minread);
+		switch ( ret )
+		{
+			case 0:
+				io_logger().info(std::format("fd {}: received data", streamsocket<DomainT>::get()));
+				consume_received();
+				break;
+			case EPIPE:
+			case ECONNRESET:
+				io_logger().warn(std::format("fd {}: connection lost", streamsocket<DomainT>::get()));
+				if ( m_read_action ) [[likely]]
 					m_read_action(*this, std::span<const std::byte> { });
-					break;
-				case EAGAIN:  [[unlikely]]
-					return;
-				default:
-					throws<unexpected_error>("unexpected code received: " + std::to_string(ret));
-			}
+				break;
+			case EAGAIN:
+				io_logger().trace(std::format("fd {}: not enough data ({}/{})", streamsocket<DomainT>::get(),
+				                               m_istream_buffer.in_avail(), m_minread));
+				return;
+			default: [[unlikely]]
+				throws<unexpected_error>("unexpected code received: " + std::to_string(ret));
 		}
+	}
 
-		void consume_received()
+	void on_write()
+	{
+		io_logger().info(std::format("fd {}: sending data", streamsocket<DomainT>::get()));
+		auto res = m_ostream_buffer.send(streamsocket<DomainT>::get(), msgflags::nosignal | msgflags::dont_wait);
+		if ( m_ostream_buffer.empty() )
+			event::unsubscribe(EPOLLOUT);
+
+		if ( m_write_action )
+			m_write_action(*this, res);
+	}
+
+	void on_event(uint32_t events)
+	{
+		if ( events & EPOLLIN )
+			on_read();
+		if ( events & EPOLLOUT )
 		{
-			do
+			if ( m_connect_action )
+				on_connect();
+			else
+				on_write();
+		}
+	}
+
+	void consume_received()
+	{
+		if ( !m_read_action ) [[unlikely]]
+		{
+			io_logger().warn(std::format("fd {}: no read action, dropping {} bytes",
+								streamsocket<DomainT>::get(), m_istream_buffer.in_avail()));
+			m_istream_buffer.clear();
+			if ( m_readonce )
 			{
-				size_t consumed = m_read_action(*this, m_read_buffer.in());
-				m_read_buffer.consume(consumed);
-				io_logger().trace(std::format("fd {}: consumed {} bytes", streamsocket<DomainT>::get(), consumed),
-								  std::format("remaining: {}", m_read_buffer.in_avail()));
+				event::unsubscribe(EPOLLIN);
 			}
-			while ( m_read_buffer.in_avail() > 0 && m_read_buffer.in_avail() >= m_minread);
+			return;
 		}
 
-		void on_write()
+		do
 		{
-			io_logger().info(std::format("fd {}: sending data", streamsocket<DomainT>::get()), __FILE__, __LINE__);
-			auto res = m_write_buffer.send(streamsocket<DomainT>::get(), msgflags::nosignal | msgflags::dont_wait);
-			if ( m_write_buffer.empty() )
-				event::unsubscribe(EPOLLOUT);
+			size_t consumed = m_read_action(*this, m_istream_buffer.in());
+			m_istream_buffer.consume(consumed);
+			io_logger().trace(std::format("fd {}: consumed {} bytes", streamsocket<DomainT>::get(), consumed),
+								std::format("remaining: {}", m_istream_buffer.in_avail()));
 
-			if ( m_write_action )
-				m_write_action(*this, res);
+			if ( consumed == 0 )
+				break;
+
+			if ( m_readonce )
+			{
+				event::unsubscribe(EPOLLIN);
+				return;
+			}
 		}
-
-		read_buffer    m_read_buffer;
-		size_t         m_minread;
-		write_buffer   m_write_buffer;
-		read_action    m_read_action;
-		write_action   m_write_action;
-		connect_action m_connect_action;
+		while ( m_istream_buffer.in_avail() > 0 && m_istream_buffer.in_avail() >= m_minread);
+	}
 };
 
 /**
@@ -644,92 +692,165 @@ class async_socketacceptor : public socket_acceptor<DomainT>, public event
  * The async_datagramsocket class is used to manage datagram socket events
  * within an ioloop. It allows scheduling of send and receive events and
  * provides automatic cancellation when the async_datagramsocket object is
- * destroyed.
- */
+ * destroyed. Reads and writes are buffered using the istream_buffer and
+ * ostream_buffer classes, so the caller does not have to keep the data alive
+ * until the events are processed.
+*/
 template <typename DomainT>
 class async_datagramsocket : public datagramsocket<DomainT>, public event
 {
-	public:
-		using recv_action = std::function<void(ssize_t, const typename DomainT::address_type&)>;
-		using send_action = std::function<void(ssize_t)>;
+public:
+	using recv_action = std::function<void(async_datagramsocket&, const typename DomainT::address_type&, std::span<const std::byte>)>;
+	using send_action = std::function<void(async_datagramsocket&, int)>;
 
-		async_datagramsocket(ioloop& loop, int protocol)
-		: datagramsocket<DomainT> { protocol },
-		  event { loop, datagramsocket<DomainT>::m_fd },
-		  m_recv_buffer { },
-		  m_send_buffer { },
-		  m_dest { },
-		  m_recv_action { },
-		  m_send_action { }
+private:
+	bool m_readonce;
+	idgram_buffer m_istream_buffer;
+	odgram_buffer m_ostream_buffer;
+	recv_action m_recv_action;
+	send_action m_send_action;
+
+public:
+	async_datagramsocket(ioloop& loop, int protocol)
+	: datagramsocket<DomainT> { protocol },
+		event { loop, datagramsocket<DomainT>::m_fd },
+		m_readonce { },
+		m_istream_buffer { },
+		m_ostream_buffer { },
+		m_recv_action { }
+	{
+	}
+
+	async_datagramsocket(async_datagramsocket&& other)
+	: datagramsocket<DomainT> { std::move(other) },
+		event { std::move(other) },
+		m_readonce { other.m_readonce },
+		m_istream_buffer { std::move(other.m_istream_buffer) },
+		m_ostream_buffer { std::move(other.m_ostream_buffer) },
+		m_recv_action { std::move(other.m_recv_action) }
+	{
+	}
+
+	/**
+	* Asynchronously receive a datagram.
+	*
+	* \param action The callback invoked once a datagram has been received,
+	*        with its source address and received data. The data is only
+	*        valid for the duration of the callback.
+	*/
+	void on_async_recvfrom(recv_action &&action)
+	{
+		m_recv_action = std::move(action);
+		event::subscribe(false, EPOLLIN);
+	}
+
+	/**
+	 * Asynchronously read data from the socket
+	 *
+	 * \param once if true, after one successful read we'll stop looking for incoming packets. if false, we'll look
+	 * for incoming packets indefinitively.
+	 *
+	 * \remarks successive calls to this methode will override the previous ones
+	 */
+	void async_recvfrom(bool once)
+	{
+		m_readonce = once;
+		event::subscribe(false, EPOLLIN);
+
+		if ( m_istream_buffer.in_avail() > 0 )
 		{
+			m_loop.post(
+				[this]()
+				{
+					consume_received();
+				}
+			);
 		}
+	}
 
-		/**
-		* Asynchronously receive a datagram into the given buffer.
-		*
-		* \param buffer The buffer that will receive the datagram.
-		* \param action The callback invoked once a datagram has been received,
-		*        with the number of bytes read (or -1 on error) and the source
-		*        address of the datagram.
-		*/
-		void async_recvfrom(std::span<std::byte> buffer, recv_action &&action)
-		{
-			m_recv_buffer = buffer;
-			m_recv_action = std::move(action);
-			event::subscribe(false, EPOLLIN);
-		}
+	/**
+	 * Set the method called when data have been sent
+	 *
+	 * \param action The callback invoked once data has been sent, with the
+	 *        number of bytes sent (or -1 on error).
+	 */
+	void on_async_sent(send_action &&action)
+	{
+		m_send_action = std::move(action);
+	}
 
-		/**
-		* Asynchronously send a datagram to the given destination.
-		*
-		* \param buffer The buffer containing the datagram to send.
-		* \param dest The address to send the datagram to.
-		* \param action The callback invoked once the datagram has been sent,
-		*        with the number of bytes sent (or -1 on error).
-		*/
-		void async_sendto(const std::span<const std::byte> buffer, const DomainT::address_type &dest, send_action &&action)
-		{
-			m_send_buffer = buffer;
-			m_dest = dest;
-			m_send_action = std::move(action);
+	/**
+	* Asynchronously send a datagram to the given destination.
+	*
+	* \param buffer The buffer containing the datagram to send. The data is
+	*        copied into an internal write buffer.
+	* \param dest The address to send the datagram to.
+	* \param action The callback invoked once the datagram has been sent,
+	*        with 0 on success or the errno value on failure.
+	*/
+	void async_sendto(const std::span<const std::byte> buffer, const DomainT::address_type &dest)
+	{
+		bool schedule = m_ostream_buffer.empty();
+		m_ostream_buffer.enqueue(buffer, dest);
+		if ( schedule )
 			event::subscribe(false, EPOLLOUT);
-		}
+	}
 
-		~async_datagramsocket()
+	~async_datagramsocket()
+	{
+		io_logger().trace(std::format("fd {} dgram async socket closed", datagramsocket<DomainT>::get()));
+	}
+
+private:
+
+	void on_event(uint32_t events)
+	{
+		if ( events & EPOLLIN )
+			on_recv();
+		if ( events & EPOLLOUT )
+			on_send();
+	}
+
+	void on_recv()
+	{
+		io_logger().info(std::format("fd {}: receiving datagram", datagramsocket<DomainT>::get()));
+		int ret = m_istream_buffer.receive(datagramsocket<DomainT>::get(),
+		                                   msgflags::nosignal | msgflags::dont_wait);
+		switch ( ret )
 		{
+			case 0:
+				consume_received();
+				break;
+			case EAGAIN:  [[unlikely]]
+				return;
+			default:
+				throws<unexpected_error>("unexpected code received: " + std::to_string(ret));
 		}
+	}
 
-	private:
+	void consume_received()
+	{
+		if ( m_istream_buffer.empty() ) [[unlikely]]
+			return;
 
-		void on_event(uint32_t events)
-		{
-			// we are called with a reference to ourselves, since we inherit
-			// from event, so we can cast it back
-			if ( events & EPOLLIN )
-				on_recv();
-			if ( events & EPOLLOUT )
-				on_send();
-		}
+		typename DomainT::address_type src;
+		auto datagram = m_istream_buffer.in(src);
+		m_recv_action(*this, src, datagram);
+		io_logger().trace(std::format("fd {}: consumed {} bytes datagram from {}",
+		                              datagramsocket<DomainT>::get(), datagram.size(), to_string(src)));
+		m_istream_buffer.consume();
+	}
 
-		void on_recv()
-		{
-			typename DomainT::address_type recv_src;
-			ssize_t n = datagramsocket<DomainT>::recvfrom(m_recv_buffer, msgflags::nosignal, &recv_src);
-			m_recv_action(n, recv_src);
-		}
+	void on_send()
+	{
+		io_logger().info(std::format("fd {}: sending datagram", datagramsocket<DomainT>::get()));
+		int res = m_ostream_buffer.send(datagramsocket<DomainT>::get(), msgflags::nosignal | msgflags::dont_wait);
+		if ( m_ostream_buffer.empty() )
+			event::unsubscribe(EPOLLOUT);
 
-		void on_send()
-		{
-			ssize_t n = datagramsocket<DomainT>::sendto(m_send_buffer, msgflags::dont_wait | msgflags::nosignal, m_dest);
-			m_send_action(n);
-		}
-
-		std::span<std::byte> m_recv_buffer;
-		std::span<const std::byte> m_send_buffer;
-		DomainT::address_type m_dest;
-		msgflags m_flags;
-		recv_action m_recv_action;
-		send_action m_send_action;
+		if ( m_send_action )
+			m_send_action(*this, res);
+	}
 };
 
 }

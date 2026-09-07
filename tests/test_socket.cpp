@@ -1,4 +1,5 @@
 #include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <set>
@@ -15,11 +16,6 @@ using namespace std::string_view_literals;
 
 namespace
 {
-
-
-constexpr size_t datagram_size = 1024;
-constexpr const char* server_dgram_path = "/tmp/corecpp_test_dgram_server.sock";
-constexpr const char* client_dgram_path = "/tmp/corecpp_test_dgram_client.sock";
 
 static corecpp::diagnostic::event_producer& test_logger()
 {
@@ -95,12 +91,18 @@ private:
 
 	void echo_loop(socket_type &conn)
 	{
-		conn.async_recv(
-			0,
+		conn.on_async_recv(
 			[this] (socket_type& conn, std::span<const std::byte> buffer)
 			{
 				return on_recv(conn, buffer);
 			});
+		conn.on_async_sent(
+			[](socket_type&, int err)
+			{
+				ensure_equal(0, err);
+			});
+
+		conn.async_recv(0, false);
 	}
 
 	size_t on_recv(socket_type& conn, std::span<const std::byte> buffer)
@@ -117,11 +119,7 @@ private:
 		}
 
 		test_logger().debug(std::format("received {} bytes, will reemit back", buffer.size()));
-		conn.async_send(buffer,
-						[](socket_type&, int err)
-						{
-							ensure_equal(0, err);
-						});
+		conn.async_send(buffer);
 		return buffer.size();
 	}
 
@@ -130,17 +128,68 @@ private:
 	std::set<socket_type> m_conns;
 };
 
-class test_socket : public test_fixture
+class echo_dgram_server
 {
 
-	struct test
+public:
+	using socket_type = async_datagramsocket<family::local>;
+
+private:
+	ioloop& m_loop;
+	socket_type m_socket;
+
+public:
+	explicit echo_dgram_server(ioloop& loop) :
+		m_loop { loop },
+		m_socket { loop, 0 }
+	{
+	}
+
+	void start(const sockaddr_un &sock_file)
+	{
+		m_socket.bind(sock_file);
+		/* m_socket.listen(16); /* arbitrary value */
+		m_socket.on_async_recvfrom(
+			[this] (socket_type&, const family::local::address_type& src, std::span<const std::byte> buffer)
+			{
+				on_recv(src, buffer);
+			});
+		/*
+		m_socket.on_async_sent(
+			[](socket_type&, int err)
+			{
+				ensure_equal(0, err);
+			});
+		*/
+	}
+
+private:
+
+	size_t on_recv(const family::local::address_type& src, std::span<const std::byte> buffer)
+	{
+		test_logger().debug(std::format("received dgram of {} bytes, will reemit back", buffer.size()));
+		m_socket.async_sendto(buffer, src);
+		return buffer.size();
+	}
+};
+
+
+class test_stream_socket : public test_fixture
+{
+	struct echo_test
 	{
 		size_t packet_size;
 	};
 
+	static constexpr const char* socket_path = "/tmp/corecpp_test_socket.sock";
+
+	ioloop m_loop;
+	const family::local::address_type m_socket_addr = make_address(socket_path);
+	std::vector<std::byte> m_packet = {};
+
 	test_case_result test_echo()
 	{
-		static const test_cases<test> cases
+		static const test_cases<echo_test> cases
 		{
 			{ 1 },  { 4 }, { 1024 }, { 8192 }, { 32657 }
 		};
@@ -151,167 +200,169 @@ class test_socket : public test_fixture
 
 		return run(
 			cases,
-			[this] (const test &t)
+			[this] (const echo_test &t)
 			{
-				logger().info(std::format("Test {} bytes", t.packet_size));
+				run_echo_test(t);
+			});
+	}
 
-				async_streamsocket<family::local> client { m_loop, 0 };
-				m_loop.post(
-					[this, &client, &t]()
+	void run_echo_test(const echo_test &t)
+	{
+		logger().info(std::format("Test {} bytes", t.packet_size));
+
+		async_streamsocket<family::local> client { m_loop, 0 };
+		m_loop.post(
+			[this, &client, &t]()
+			{
+				client.async_connect(
+					m_socket_addr,
+					[this, &t](async_streamsocket<family::local>& client, int)
 					{
-						client.async_connect(
-							m_socket_addr,
-							[this, &t](async_streamsocket<family::local>& client, int)
-							{
-								client_connected(client, t);
-							});
+						echo_client_connected(client, t);
 					});
-
-				m_loop.run_timeout(
-					std::chrono::seconds(5),
-					[this](void)
-					{
-						assert_equal("Timeout reached!"sv, "packet should have been received before"sv);
-					}
-				);
 			});
-	}
 
-	void client_connected(async_streamsocket<family::local> &client, const test &t)
-	{
-		logger().trace("client connected, will send data");
-		std::vector<std::byte> packet(t.packet_size);
-		for (size_t i = 0; i < packet.size(); ++i)
-			packet[i] = static_cast<std::byte>(i * 131 + 17); //TODO: use randon datas
-
-		client.async_send(
-			packet,
-			[this, packet](async_streamsocket<family::local>& client, int err)
+		m_loop.run_timeout(
+			std::chrono::seconds(5),
+			[this](void)
 			{
-				fatal_equal(err, 0);
-				packet_sent(client, packet);
-			});
-	}
-
-	void packet_sent(async_streamsocket<family::local>& client, std::vector<std::byte> sent_packet)
-	{
-		logger().trace("packet sent");
-		client.async_recv(
-			sent_packet.size(),
-			[this, sent_packet](async_streamsocket<family::local>&, std::span<const std::byte> received)
-			{
-				return packet_received(sent_packet, received);
+				assert_equal("Timeout reached!"sv, "packet should have been received before"sv);
 			}
 		);
 	}
 
-	size_t packet_received(std::span<const std::byte> sent, std::span<const std::byte> received)
+	void echo_client_connected(async_streamsocket<family::local> &client, const echo_test &t)
+	{
+		logger().trace("client connected, will send data");
+		m_packet.resize(t.packet_size);
+		for (size_t i = 0; i < m_packet.size(); ++i)
+			m_packet[i] = static_cast<std::byte>(i * 131 + 17); //TODO: use randon datas
+
+		client.on_async_sent(
+			[this](async_streamsocket<family::local>& client, int err)
+			{
+				logger().trace("packet sent");
+				fatal_equal(err, 0);
+				client.async_recv(m_packet.size(), true);
+			});
+
+		client.on_async_recv(
+			[this](async_streamsocket<family::local>&, std::span<const std::byte> received)
+			{
+				return echo_packet_received(received);
+			});
+
+		client.async_send(m_packet);
+	}
+
+	size_t echo_packet_received(std::span<const std::byte> received)
 	{
 		logger().trace("packet received");
-		fatal_equal(received.size(), sent.size());
-		for (size_t i = 0; i < sent.size(); ++i)
-			assert_equal(sent[i], received[i]);
+		fatal_equal(received.size(), m_packet.size());
+		for (size_t i = 0; i < m_packet.size(); ++i)
+			assert_equal(m_packet[i], received[i]);
 		m_loop.exit();
 		return received.size();
 	}
-
-	test_case_result test_echo_datagram()
-	{
-		::unlink(server_dgram_path);
-		::unlink(client_dgram_path);
-
-		std::vector<std::byte> sent(datagram_size);
-		for (size_t i = 0; i < sent.size(); ++i)
-			sent[i] = static_cast<std::byte>(i * 97 + 5);
-
-		std::atomic<bool> server_ready { false };
-		std::string server_error;
-		bool server_ok = false;
-
-		std::thread server { [&] {
-			try
-			{
-				async_datagramsocket<family::local> dgram { m_loop, 0 };
-				dgram.bind(make_address(server_dgram_path));
-
-				std::vector<std::byte> received(datagram_size);
-
-				/* exit the loop if nothing happens, so the test never hangs */
-				dgram.async_recvfrom(
-					std::span<std::byte> { received },
-					[this, &dgram, &received] (ssize_t n, const family::local::address_type& src)
-					{
-						if (n > 0)
-							dgram.sendto(std::span<std::byte> { received }.first(static_cast<size_t>(n)), msgflags::none, src);
-						m_loop.exit();
-					});
-
-				server_ready.store(true);
-				m_loop.run_timeout(
-					std::chrono::seconds(5),
-					[this](void)
-					{
-						assert_equal("Timeout reached!"sv, "packet should be received before"sv);
-					}
-				);
-				server_ok = true;
-			}
-			catch (const std::exception& e)
-			{
-				server_error = e.what();
-				server_ready.store(true);
-			}
-		} };
-
-		while (!server_ready.load())
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
-		std::vector<std::byte> received(datagram_size);
-		bool echoed = false;
-		if (server_error.empty()) [[likely]]
-		{
-			async_datagramsocket<family::local> dgram { m_loop, 0 };
-			dgram.bind(make_address(client_dgram_path));
-
-			dgram.async_recvfrom(std::span<std::byte> { received },
-				[&] (ssize_t n, const family::local::address_type&) {
-					echoed = (n == static_cast<ssize_t>(datagram_size) && received == sent);
-					m_loop.exit();
-				});
-
-			dgram.sendto(std::span<const std::byte> { sent }, msgflags::none,
-			             make_address(server_dgram_path));
-			m_loop.run_timeout(
-				std::chrono::seconds(5),
-				[this](void)
-				{
-					assert_equal("Timeout reached!"sv, "packet should be received before"sv);
-				}
-			);
-		}
-
-		server.join();
-		::unlink(server_dgram_path);
-		::unlink(client_dgram_path);
-
-		assert_equal(server_ok, true);
-		assert_equal(echoed, true);
-
-		return {};
-	}
-
-
-	static constexpr const char* socket_path = "/tmp/corecpp_test_socket.sock";
-
-	ioloop m_loop;
-	const family::local::address_type m_socket_addr = make_address(socket_path);
 
 public:
 	tests_type tests() override
 	{
 		return {
-			{ "test_echo", [&] () { return test_echo(); } },
-			{ "test_echo_datagram", [&] () { return test_echo_datagram(); } },
+			{ "echo", [&] () { return test_echo(); } },
+		};
+	}
+};
+
+/* TODO: check if I do not need tu use local ip adresses */
+class test_datagram_socket : public test_fixture
+{
+	struct echo_test
+	{
+		size_t dgram_size;
+	};
+
+	static constexpr const char* dgram_path = "/tmp/corecpp_test_dgram_server.sock";
+	static constexpr const char* client_path = "/tmp/corecpp_test_dgram_client.sock";
+
+	ioloop m_loop;
+	const family::local::address_type m_socket_addr = make_address(dgram_path);
+	std::vector<std::byte> m_packet = {};
+
+	test_case_result test_echo()
+	{
+		static const test_cases<echo_test> cases
+		{
+			{ 1 },  { 4 }, { 1024 }, { 8192 }, { 32657 }
+		};
+
+		::unlink(dgram_path);
+		echo_dgram_server server { m_loop };
+		server.start(m_socket_addr);
+
+		return run(
+			cases,
+			 [this] (const echo_test &t)
+			 {
+				 run_echo_test(t);
+			 });
+	}
+
+	void run_echo_test(const echo_test &t)
+	{
+		logger().info(std::format("Test {} bytes", t.dgram_size));
+
+		m_packet.resize(t.dgram_size);
+		for (size_t i = 0; i < m_packet.size(); ++i)
+			m_packet[i] = static_cast<std::byte>(i * 97 + 5);
+
+		async_datagramsocket<family::local> client { m_loop, 0 };
+		::unlink(client_path);
+		client.bind(make_address(client_path));
+		/*
+		client.on_async_sent(
+			[this](async_datagramsocket<family::local>& client, int err)
+			{
+				logger().trace("dgram sent");
+				fatal_equal(err, 0);
+				client.async_recvfrom(true);
+			});
+		*/
+		client.on_async_recvfrom(
+			[this](async_datagramsocket<family::local>&, const family::local::address_type&, std::span<const std::byte> received)
+			{
+				return echo_packet_received(received);
+			});
+		m_loop.post(
+			[this, &client]()
+			{
+				client.async_sendto(m_packet, m_socket_addr);
+			});
+
+		m_loop.run_timeout(
+			std::chrono::seconds(5),
+			[this](void)
+			{
+				assert_equal("Timeout reached!"sv, "packet should have been received before"sv);
+			}
+		);
+	}
+
+	size_t echo_packet_received(std::span<const std::byte> received)
+	{
+		logger().trace("dgram received");
+		fatal_equal(received.size(), m_packet.size());
+		for (size_t i = 0; i < m_packet.size(); ++i)
+			assert_equal(m_packet[i], received[i]);
+		m_loop.exit();
+		return received.size();
+	}
+
+public:
+	tests_type tests() override
+	{
+		return {
+			{ "echo", [&] () { return test_echo(); } },
 		};
 	}
 };
@@ -319,7 +370,8 @@ public:
 int main(int argc, char** argv)
 {
 	test_unit unit { "Socket" };
-	unit.add_fixture<test_socket>("test_socket");
+	unit.add_fixture<test_stream_socket>("test_stream_socket");
+	unit.add_fixture<test_datagram_socket>("test_datagram_socket");
 
 	return unit.run(argc, argv);
 }

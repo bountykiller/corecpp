@@ -29,6 +29,30 @@ enum class socktype : int16_t
 };
 */
 
+static inline socklen_t address_len(const sockaddr_un& addr) noexcept
+{
+	return SUN_LEN(&addr);
+}
+static inline std::string to_string(const sockaddr_un& addr) noexcept
+{
+	return addr.sun_path;
+}
+
+static inline constexpr socklen_t address_len(const sockaddr_in& addr) noexcept
+{
+	return sizeof(addr);
+}
+
+static inline constexpr socklen_t address_len(const sockaddr_in6& addr) noexcept
+{
+	return sizeof(addr);
+}
+
+static inline constexpr socklen_t address_len(const sockaddr_nl& addr) noexcept
+{
+	return sizeof(addr);
+}
+
 template <int LevelT, int OptionT, typename ValueT>
 struct socket_option
 {
@@ -37,6 +61,8 @@ struct socket_option
 	static constexpr int option = OptionT;
 	ValueT value;
 };
+
+using so_passcred = socket_option<SOL_SOCKET, SO_PASSCRED, int>;
 
 template<typename T>
 concept SocketOption = requires (T opt)
@@ -53,7 +79,7 @@ public:
 	: filedesc { ::socket(domain, type, protocol) }
 	{
 		if (m_fd < 0)
-			corecpp::throws<std::system_error>(errno, std::system_category());
+			corecpp::throw_system_error(errno, std::system_category());
 	}
 	socket(const socket& other) = delete;
 	socket& operator=(const socket &) = delete;
@@ -77,7 +103,7 @@ protected:
 	void set_option(const OptionT& opt)
 	{
 		if (setsockopt(m_fd, OptionT::level, OptionT::option, &opt.value, sizeof(opt.value))) [[unlikely]]
-			corecpp::throws<std::system_error>(errno, std::system_category());
+			corecpp::throw_system_error(errno, std::system_category());
 	}
 };
 
@@ -107,8 +133,7 @@ public:
 
 	ssize_t connect(const DomainT::address_type &dest)
 	{
-		return ::connect(m_fd, reinterpret_cast<const struct sockaddr*>(&dest),
-		                 DomainT::address_len(dest));
+		return ::connect(m_fd, reinterpret_cast<const struct sockaddr*>(&dest), address_len(dest));
 	}
 
 	ssize_t send(const std::span<const std::byte> buffer, const flags<msgflags> flags)
@@ -170,8 +195,7 @@ public:
 
 	void bind(const DomainT::address_type &addr) const
 	{
-		int ret = ::bind(m_fd, reinterpret_cast<const struct sockaddr*>(&addr),
-		                 DomainT::address_len(addr));
+		int ret = ::bind(m_fd, reinterpret_cast<const struct sockaddr*>(&addr), address_len(addr));
 		if ( ret )
 			corecpp::throw_system_error(errno, std::system_category());
 	}
@@ -218,12 +242,19 @@ public:
 	datagramsocket(const datagramsocket& other) = delete;
 	datagramsocket& operator=(const datagramsocket &) = delete;
 
-	void bind(const DomainT::address_type &addr) const
+	void bind(const DomainT::address_type &addr)
 	{
-		int ret = ::bind(m_fd, reinterpret_cast<const struct sockaddr*>(&addr),
-						 DomainT::address_len(addr));
+		int ret = ::bind(m_fd, reinterpret_cast<const struct sockaddr*>(&addr), address_len(addr));
 		if ( ret )
 			corecpp::throw_system_error(errno, std::system_category());
+		/*
+		if constexpr ( std::is_same_v<DomainT, corecpp::family::local> )
+		{
+			//get credentials
+			so_passcred opt { 1 };
+			set_option<so_passcred>(opt);
+		}
+		*/
 	}
 
 	ssize_t sendto(const std::span<const std::byte> buffer, const flags<msgflags> flags, const DomainT::address_type &dest)
@@ -232,7 +263,7 @@ public:
 			return 0;
 
 		return ::sendto(m_fd, buffer.data(), buffer.size(), flags.get(),
-		                reinterpret_cast<const struct sockaddr*>(&dest), DomainT::address_len(dest));
+		                reinterpret_cast<const struct sockaddr*>(&dest), address_len(dest));
 	}
 
 	ssize_t sendto(const std::span<const std::byte> buffer, const flags<msgflags> flags, const DomainT::address_type &dest, std::chrono::milliseconds timeout)
@@ -259,7 +290,7 @@ public:
 		}
 
 		return ::sendto(m_fd, buffer.data(), buffer.size(), flags.get(),
-		                reinterpret_cast<const struct sockaddr*>(&dest), DomainT::address_len(dest));
+		                reinterpret_cast<const struct sockaddr*>(&dest), address_len(dest));
 	}
 
 	ssize_t recvfrom(std::span<std::byte> buffer, const flags<msgflags> flags, DomainT::address_type* src = nullptr)

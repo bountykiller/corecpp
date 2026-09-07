@@ -135,10 +135,5 @@ void ioloop::remove(int fd)
 	m_events.erase(fd);
 }
 
-void throw_system_error(int err, const std::error_category& cat)
-{
-	throw std::system_error { err, cat };
-}
-
 
 }

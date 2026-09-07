@@ -141,7 +141,11 @@ namespace corecpp
 		throw ExceptionT { std::forward<ArgsT>(args)... };
 	}
 
-	[[ noreturn ]] void throw_system_error(int err, const std::error_category& cat);
+	template<typename... ArgsT>
+	[[ noreturn ]] void throw_system_error(int err, const std::error_category& cat, ArgsT&&... args)
+	{
+		corecpp::throws<std::system_error>(err, cat, std::forward<ArgsT>(args)...);
+	}
 
 	[[ noreturn ]] static inline void unreachable()
 	{
